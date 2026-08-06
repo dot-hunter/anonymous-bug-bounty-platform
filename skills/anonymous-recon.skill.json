@@ -1,0 +1,79 @@
+{
+  "name": "anonymous-recon",
+  "version": "2026.1",
+  "description": "Anonymous reconnaissance with Tor/VPN routing, proxy chains, and identity isolation for OPSEC-first bug bounty hunting",
+  "author": "OpenCode Upgrader",
+  "license": "MIT",
+  "tags": ["bug-bounty", "pentest", "osint", "2026", "anonymous", "opsec", "tor", "vpn"],
+  "anonymous": true,
+  "requires": {
+    "nodejs": ">=20.0.0",
+    "python": ">=3.10",
+    "tor": ">=0.4.0",
+    "wireguard": ">=1.0"
+  },
+  "tools": {
+    "vulnera-mcp": "~/.opencode/mcp/servers/vulnera-mcp/server.py",
+    "bounty-directory": "~/.opencode/mcp/servers/bounty-directory/server.py",
+    "agent-reach": "~/.opencode/mcp/servers/agent-reach/server.py"
+  },
+  "execution": {
+    "mode": "mcp",
+    "timeout_seconds": 300,
+    "retry_count": 3,
+    "failover": true,
+    "swarm_mode": false,
+    "ai_assisted": true,
+    "anonymous_first": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "~/.config/vulnera-mcp/anonymous-recon.log",
+    "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    "sanitize": true
+  },
+  "opsec": {
+    "vpn_rotation": {
+      "enabled": true,
+      "provider": "wireguard",
+      "rotation_interval_seconds": 1800,
+      "kill_switch": true,
+      "countries": ["switzerland", "iceland", "netherlands"]
+    },
+    "tor_routing": {
+      "enabled": true,
+      "circuit_rotation_seconds": 600,
+      "isolate_dest_addr": true,
+      "exit_nodes": "{ch},{is},{nl}"
+    },
+    "proxy_chain": {
+      "enabled": true,
+      "type": "residential",
+      "chain_length": 3,
+      "rotation_on_block": true
+    },
+    "dns_isolation": {
+      "enabled": true,
+      "provider": "cloudflare",
+      "protocol": "doh",
+      "flush_between_targets": true
+    },
+    "browser_isolation": {
+      "enabled": true,
+      "profile_per_target": true,
+      "fingerprint_randomization": true,
+      "webrtc_disabled": true
+    },
+    "identity_rotation": {
+      "enabled": true,
+      "burner_email_provider": "protonmail",
+      "pgp_per_identity": true
+    }
+  },
+  "techniques_2026": {
+    "passive_recon": ["certificate_transparency", "dns_dumpster", "securitytrails_free", "github_dorks", "wayback_machine"],
+    "active_recon": ["subdomain_enum", "dns_recon", "tech_fingerprint", "port_scan_exclude_cdn"],
+    "osint": ["sn0int_integration", "agent_reach_osint", "autonomous_recon", "twitter_search", "reddit_threads"],
+    "anonymity": ["tor_egress", "vpn_rotation", "proxy_chains", "traffic_shaping", "identity_rotation"]
+  }
+}

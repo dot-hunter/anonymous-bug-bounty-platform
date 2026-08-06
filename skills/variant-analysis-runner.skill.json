@@ -1,0 +1,42 @@
+{
+  "name": "variant-analysis-runner",
+  "version": "2026.08",
+  "description": "Given a confirmed vulnerability pattern, automatically writes a Semgrep rule, runs it against the current repo and GitHub code search, and returns a list of potential variant locations ranked by exploitability.",
+  "author": "OpenCode Security Research Agent",
+  "license": "MIT",
+  "tags": ["security", "variant-analysis", "semgrep", "code-search", "2026"],
+  "trigger": "when a vulnerability is confirmed and needs variant analysis",
+  "inputs": {
+    "confirmed_vuln_location": "string — file:line of the confirmed finding",
+    "vuln_class": "string — prototype-pollution | ssrf | sqli | deserialization | race-condition | prompt-injection",
+    "root_cause_description": "string — natural language root cause"
+  },
+  "outputs": [
+    "custom_semgrep_rule.yaml — generated Semgrep rule for the pattern",
+    "variant_locations.json — file:line for each match in the repo",
+    "github_search_query.txt — for external scope expansion",
+    "exploitability_scores.json — ranked by data flow completeness"
+  ],
+  "steps": [
+    "1. Characterize the root cause precisely (not 'SSRF in webhook' but 'HTTP client with user URL, no allowlist, no redirect disable, hitting metadata endpoint')",
+    "2. Generate Semgrep rule via variant_analysis MCP tool",
+    "3. Run rule against: rest of same codebase, GitHub code search, similar open source projects, sibling methods",
+    "4. For each variant: assess same sink/different source, same pattern/different context, downstream dependency",
+    "5. Escalation path analysis: can variant chain with another finding? Does it reach a more sensitive sink?"
+  ],
+  "mcp_tools": ["variant_analysis", "run_semgrep"],
+  "supported_vuln_classes": ["prototype-pollution", "ssrf", "sqli", "deserialization", "race-condition", "prompt-injection"],
+  "escalation_analysis": {
+    "questions": [
+      "Can this variant be chained with another finding for higher impact?",
+      "Does the variant reach a more sensitive sink than the original?",
+      "Is the variant harder to detect (blind vs error-based)?"
+    ]
+  },
+  "execution": {
+    "mode": "mcp",
+    "timeout_seconds": 300,
+    "retry_count": 2,
+    "ai_assisted": true
+  }
+}

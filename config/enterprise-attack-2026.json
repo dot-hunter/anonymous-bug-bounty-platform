@@ -1,0 +1,123 @@
+{
+  "version": "2026.1",
+  "description": "Enterprise identity and infrastructure attack matrices for 2026 bug bounty hunting",
+  "identity_attack_matrices": {
+    "enterprise_sso": {
+      "description": "Attack enterprise SSO implementations (SAML, OIDC, OAuth 2.0)",
+      "techniques": [
+        "SAML signature stripping",
+        "SAML assertion injection",
+        "OIDC redirect URI manipulation",
+        "OAuth authorization code interception",
+        "PKCE bypass",
+        "Token replay attacks",
+        "MFA bypass via SMS interception",
+        "MFA bypass via social engineering",
+        "Session fixation",
+        "JWT algorithm confusion (none/HS256)",
+        "JWT key confusion (secret/asymmetric)",
+        "JWT issuer spoofing",
+        "JWT audience confusion"
+      ],
+      "tools": ["saml-tool", "oidc-debug", "oauth-toolkit", "jwt_tool"]
+    },
+    "active_directory": {
+      "description": "Attack Active Directory and LDAP environments",
+      "techniques": [
+        "Kerberoasting",
+        "Pass-the-ticket",
+        "Pass-the-hash",
+        "Silver ticket",
+        "Golden ticket",
+        "DCSync",
+        "LDAP injection",
+        "NTLM relay",
+        "BloodHound attack paths",
+        "ACL abuse",
+        "Group policy manipulation"
+      ],
+      "tools": ["bloodhound", "ldapdomaindump", "impacket", "netexec"]
+    },
+    "cloud_identity": {
+      "description": "Attack cloud identity providers (AWS IAM, Azure AD, GCP IAM)",
+      "techniques": [
+        "IAM role escalation",
+        "Instance metadata extraction",
+        "Over-privileged service accounts",
+        "Cross-account role assumption",
+        "Temporary credential theft",
+        "OAuth token theft",
+        "API key exposure",
+        "Secrets manager access"
+      ],
+      "tools": ["awscli", "az", "gcloud", "steampipe"]
+    }
+  },
+  "infrastructure_attack_matrices": {
+    "kubernetes": {
+      "description": "Attack Kubernetes clusters",
+      "techniques": [
+        "API server exposure",
+        "Kubelet anonymous auth",
+        "RBAC escalation",
+        "Container escape",
+        "Secret extraction from pods",
+        "Service account token theft",
+        "Ingress controller abuse",
+        "Namespace traversal"
+      ],
+      "tools": ["kubectl", "kube-hunter", "kubescape", "trivy"]
+    },
+    "aws": {
+      "description": "Attack AWS infrastructure",
+      "techniques": [
+        "S3 bucket enumeration",
+        "S3 bucket ACL abuse",
+        "Lambda function injection",
+        "EC2 metadata extraction",
+        "RDS exposure",
+        "ElastiCache exposure",
+        "CloudTrail log tampering",
+        "IAM policy escalation"
+      ],
+      "tools": ["awscli", "s3scanner", "cloudsploit", "prowler"]
+    },
+    "azure": {
+      "description": "Attack Azure infrastructure",
+      "techniques": [
+        "Azure AD enumeration",
+        "Azure Storage exposure",
+        "Azure Key Vault access",
+        "Azure Function injection",
+        "ARM template exposure",
+        "Managed identity abuse"
+      ],
+      "tools": ["az", "azure-cli", "stormspotter"]
+    },
+    "gcp": {
+      "description": "Attack GCP infrastructure",
+      "techniques": [
+        "GCS bucket enumeration",
+        "GCP IAM abuse",
+        "Cloud Functions injection",
+        "GKE cluster exposure",
+        "Secret Manager access",
+        "Service account key exposure"
+      ],
+      "tools": ["gcloud", "gcp-service-accounts", "cloudsplaining"]
+    }
+  },
+  "iot_attack_matrices": {
+    "description": "Attack IoT and embedded systems",
+    "techniques": [
+      "Firmware extraction",
+      "UART/JTAG debug interface",
+      "Bluetooth BLE exploitation",
+      "Zigbee protocol abuse",
+      "MQTT broker exposure",
+      "Default credential exploitation",
+      "Firmware update mechanism abuse"
+    ],
+    "tools": ["binwalk", "firmwalker", "iotgoat", "killerbee"]
+  }
+}

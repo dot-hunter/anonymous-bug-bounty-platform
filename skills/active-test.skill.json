@@ -1,0 +1,48 @@
+{
+  "name": "active-test",
+  "version": "2026.1",
+  "description": "Active vulnerability testing — real XSS, SQLi, IDOR, CSP, WAF bypass, and auth testing with production-grade tool integration",
+  "author": "OpenCode Upgrader",
+  "license": "MIT",
+  "tags": ["bug-bounty", "pentest", "active-testing", "2026", "xss", "sqli", "idor", "waf-bypass"],
+  "anonymous": true,
+  "requires": {
+    "nodejs": ">=20.0.0",
+    "python": ">=3.10"
+  },
+  "tools": {
+    "vulnera-mcp": "~/.opencode/mcp/servers/vulnera-mcp/server.py",
+    "bounty-directory": "~/.opencode/mcp/servers/bounty-directory/server.py",
+    "agent-reach": "~/.opencode/mcp/servers/agent-reach/server.py"
+  },
+  "execution": {
+    "mode": "mcp",
+    "timeout_seconds": 600,
+    "retry_count": 3,
+    "failover": true,
+    "swarm_mode": true,
+    "ai_assisted": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "~/.config/vulnera-mcp/active-test.log",
+    "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  },
+  "security": {
+    "scope_check_before_every_request": true,
+    "rate_limit_adaptive": true,
+    "max_requests_per_minute": 30,
+    "jitter_ms": 200,
+    "respect_robots_txt": true,
+    "no_destructive_tests": true
+  },
+  "techniques_2026": {
+    "xss": ["dalfox_scanning", "xsstrike_fallback", "dom_clobbering", "mutation_xss", "polyglot_payloads"],
+    "sqli": ["sqlmap_automation", "error_based", "time_based_blind", "union_based", "out_of_band"],
+    "idor": ["parameter_variation", "multi_account_testing", "response_diffing", "uuid_analysis"],
+    "csp_bypass": ["jsonp_gadgets", "nonce_prediction", "base_injection", "script_gadget_db"],
+    "waf_bypass": ["differential_fuzzing", "encoding_chains", "case_mixing", "comment_injection", "http_parameter_pollution"],
+    "auth_bypass": ["jwt_attacks", "oauth_flow_manipulation", "session_fixation", "saml_signature_stripping"],
+    "api_security": ["graphql_introspection", "batch_abuse", "websocket_auth_bypass", "grpc_fuzzing"]
+  }
+}

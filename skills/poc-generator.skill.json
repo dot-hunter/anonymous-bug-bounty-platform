@@ -1,0 +1,43 @@
+{
+  "name": "poc-generator",
+  "version": "2026.08",
+  "description": "Given a confirmed vulnerability with location and class, generates a complete Docker-based PoC environment with a single-command trigger script.",
+  "author": "OpenCode Security Research Agent",
+  "license": "MIT",
+  "tags": ["security", "poc", "docker", "exploit", "reproduction", "2026"],
+  "trigger": "when a vulnerability is confirmed and needs a PoC",
+  "inputs": {
+    "vuln_location": "string — file:line",
+    "vuln_class": "string — vulnerability class identifier",
+    "target_version": "string — exact vulnerable version",
+    "target_language": "string — python | javascript | typescript | go | ruby | php | java",
+    "exploit_payload": "string — known payload or TODO placeholder",
+    "title": "string — report title",
+    "cvss_vector": "string — CVSS 3.1 vector (default: AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H)"
+  },
+  "outputs": [
+    "Dockerfile — pinned to exact vulnerable version",
+    "poc.py or poc.sh — one-command trigger",
+    "expected_output.txt — what success looks like",
+    "report_draft.md — pre-filled with title, CVSS, steps"
+  ],
+  "poc_requirements": {
+    "environment": "Docker container pinned to exact vulnerable version, one-command setup",
+    "trigger": "Single script (python3 poc.py or bash poc.sh) with clear success indicator",
+    "anatomy": ["Setup: establish session/auth if needed", "Payload: construct malicious input", "Trigger: send request/invoke action", "Verify: confirm exploitation via observable output", "Impact statement: print what attacker now controls"]
+  },
+  "mcp_tools": ["generate_poc_scaffold"],
+  "supported_languages": ["python", "javascript", "typescript", "go", "ruby", "php", "java"],
+  "report_structure": {
+    "title_format": "[Vulnerability Class] in [Component] allows [Actor] to [Impact]",
+    "body": ["Impact first (what attacker can do now)", "Root cause (one sentence)", "Steps to reproduce (copy-paste ready)", "PoC (Docker command + output)", "Impact scope", "Specific remediation"],
+    "max_words": 600,
+    "note": "MCP/Agent prompt-injection chains are CVSS 9.x (Network/Low/None/None/Changed/High/High), not 7.x. Document the chain: injection point -> agent capability -> downstream impact."
+  },
+  "execution": {
+    "mode": "mcp",
+    "timeout_seconds": 120,
+    "retry_count": 1,
+    "ai_assisted": true
+  }
+}

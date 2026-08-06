@@ -1,0 +1,59 @@
+{
+  "name": "program-selector",
+  "version": "2026.1",
+  "description": "Intelligent program selection engine — ranks bounty programs by payout potential, skill match, competition density, and attack surface fit",
+  "author": "OpenCode Upgrader",
+  "license": "MIT",
+  "tags": ["bug-bounty", "program-selection", "scoring", "2026", "intelligence"],
+  "anonymous": true,
+  "requires": {
+    "nodejs": ">=20.0.0",
+    "python": ">=3.10",
+    "postgresql": ">=14"
+  },
+  "tools": {
+    "vulnera-mcp": "~/.opencode/mcp/servers/vulnera-mcp/server.py",
+    "bounty-directory": "~/.opencode/mcp/servers/bounty-directory/server.py",
+    "agent-reach": "~/.opencode/mcp/servers/agent-reach/server.py",
+    "program-intelligence": "~/.opencode/mcp/servers/program-intelligence-mcp/server.py"
+  },
+  "execution": {
+    "mode": "mcp",
+    "timeout_seconds": 120,
+    "retry_count": 2,
+    "failover": true,
+    "swarm_mode": false,
+    "ai_assisted": true
+  },
+  "scoring_weights": {
+    "bounty_amount": 0.20,
+    "attack_surface_size": 0.20,
+    "skill_match": 0.15,
+    "scope_breadth": 0.10,
+    "docs_quality": 0.05,
+    "api_presence": 0.10,
+    "graphql_present": 0.05,
+    "cloud_assets": 0.05,
+    "competition_density": 0.05,
+    "program_recency": 0.05
+  },
+  "selection_criteria": {
+    "min_bounty": 100,
+    "max_competition": "medium",
+    "preferred_tech_stack": ["react", "graphql", "aws", "kubernetes"],
+    "scope_preferences": ["wildcard", "mobile", "api"],
+    "exclude_vdp_only": true
+  },
+  "output": {
+    "ranked_list": true,
+    "score_breakdown": true,
+    "recommended_first_action": true,
+    "estimated_time_to_first_finding": true,
+    "skill_gap_analysis": true
+  },
+  "techniques_2026": {
+    "program_discovery": ["hackerone_api", "bugcrowd_api", "immunefi_scrape", "security_txt"],
+    "enrichment": ["tech_fingerprint", "subdomain_count", "api_surface_analysis", "scope_parsing"],
+    "scoring": ["weighted_multi_factor", "bayesian_ranking", "historical_payout_analysis"]
+  }
+}

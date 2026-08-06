@@ -1,0 +1,51 @@
+{
+  "name": "correlation",
+  "version": "2026.1",
+  "description": "2026 OpenCode bug bounty skill — correlation with AI-powered autonomous recon, swarm pentesting, and ML-based WAF bypass",
+  "author": "OpenCode Upgrader",
+  "license": "MIT",
+  "tags": ["bug-bounty", "pentest", "osint", "2026", "ai-powered", "autonomous"],
+  "anonymous": true,
+  "requires": {
+    "nodejs": ">=20.0.0",
+    "python": ">=3.10",
+    "postgresql": ">=14"
+  },
+  "tools": {
+    "vulnera-mcp": "~/.opencode/mcp/servers/vulnera-mcp/server.py",
+    "bounty-directory": "~/.opencode/mcp/servers/bounty-directory/server.py",
+    "agent-reach": "~/.opencode/mcp/servers/agent-reach/server.py"
+  },
+  "execution": {
+    "mode": "mcp",
+    "timeout_seconds": 300,
+    "retry_count": 3,
+    "failover": true,
+    "swarm_mode": true,
+    "ai_assisted": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "~/.config/vulnera-mcp/skills.log",
+    "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  },
+  "security": {
+    "no_api_keys": true,
+    "rotating_user_agents": true,
+    "proxy_support": "optional",
+    "cookie_storage": "local_only",
+    "data_never_uploaded": true,
+    "ml_waf_bypass": true,
+    "differential_fuzzing": true
+  },
+  "techniques_2026": {
+    "waf_bypass": ["differential_fuzzing", "ml_heuristic_evasion", "double_url_encoding"],
+    "xss": ["dom_clobbering", "sanitizer_evasion", "csp_bypass"],
+    "api": ["graphql_introspection", "bola_idor", "rate_limit_bypass"],
+    "auth": ["jwt_algorithm_confusion", "oauth_redirect", "session_fixation"],
+    "cloud": ["s3_enum", "terraform_exposure", "k8s_api_exposure", "secret_leak"],
+    "ai_security": ["prompt_injection", "jailbreak", "data_extraction"],
+    "osint": ["sn0int_integration", "agent_reach_osint", "autonomous_recon"],
+    "swarm": ["multi_agent_orchestration", "recon_classify_exploit_report"]
+  }
+}

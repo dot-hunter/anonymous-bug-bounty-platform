@@ -1,0 +1,48 @@
+{
+  "name": "security-audit-entry-mapper",
+  "version": "2026.08",
+  "description": "Given a repository URL or local path, automatically maps all entry points (HTTP routes, gRPC definitions, CLI parsers, webhook handlers, MCP tool definitions) and outputs a prioritized audit target list ordered by trust boundary crossing risk.",
+  "author": "OpenCode Security Research Agent",
+  "license": "MIT",
+  "tags": ["security", "audit", "entry-point", "attack-surface", "semgrep", "codeql", "2026"],
+  "trigger": "when starting a new codebase audit",
+  "inputs": {
+    "repository_url": "string — git URL or local path to target repo",
+    "goal": "string — Confidentiality | Integrity | Availability | ATO | RCE",
+    "vuln_class_focus": "array — 1-2 classes from Tier 1 list"
+  },
+  "outputs": [
+    "entry_point_map.json — structured list of sources with metadata",
+    "sink_inventory.json — dangerous function calls with file locations",
+    "trust_boundary_diagram.md — Mermaid diagram of component trust relationships",
+    "priority_audit_targets.md — ranked list with rationale"
+  ],
+  "steps": [
+    "1. Clone/access repository",
+    "2. Run language detection",
+    "3. Execute framework-specific router extraction (Express app._router.stack, FastAPI app.routes, Rails routes.rb, Django urls.py)",
+    "4. Enumerate non-HTTP surfaces: gRPC .proto files, CLI parsers, webhook handlers, file uploads, MQ consumers, cron inputs, MCP tool definitions, agent skill manifests",
+    "5. Run Semgrep with custom sink-detection rules (run_semgrep MCP tool)",
+    "6. Run CodeQL for cross-function taint paths (run_codeql MCP tool)",
+    "7. Generate trust boundary diagram from component analysis",
+    "8. Score each entry point by: trust_crossing x sink_proximity x auth_check_distance",
+    "9. Output ranked audit target list"
+  ],
+  "mcp_tools": ["run_semgrep", "run_codeql", "list_custom_rules", "load_custom_rule"],
+  "priority_surface": {
+    "http_rest": ["all routes in router files", "every HTTP method per route", "hidden parameters via Arjun+ParamMiner", "GraphQL introspection + schema analysis", "WebSocket upgrade paths"],
+    "non_http": ["gRPC .proto files", "CLI argument parsers", "webhook handlers", "file upload parsers", "message queue consumers", "cron job inputs", "MCP tool definitions", "agent skill manifests"],
+    "mcp_specific": ["tool call parameter schemas", "tool response deserialization", "session initialization handshake", "multi-server pipeline junctions", "skill manifest dependency declarations", "agent context window injection"]
+  },
+  "execution": {
+    "mode": "mcp",
+    "timeout_seconds": 600,
+    "retry_count": 2,
+    "swarm_mode": true,
+    "ai_assisted": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "~/.config/opencode/session-logs/entry-mapper.log"
+  }
+}

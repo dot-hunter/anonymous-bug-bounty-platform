@@ -1,0 +1,231 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Anonymous autopilot default: opencode's built-in free model — no API keys.
+  "model": "opencode/ling-3.0-flash-free",
+  "mcp": {
+    "hackerone": {
+      "type": "local",
+      "command": ["/home/bb/tools/claude-bug-bounty/.venv-mcp/bin/python", "/home/bb/tools/claude-bug-bounty/mcp/hackerone-mcp/server.py"],
+      "enabled": true,
+      // Integrity: SHA-256 hash of the server.py file for tamper detection.
+      // Recompute after any change: sha256sum /home/bb/tools/claude-bug-bounty/mcp/hackerone-mcp/server.py
+      "integrity_sha256": "95939f0caca58ef74a407e3c57ae98e4a1b7c0e56d35ed5bbb16018ebc988cf0"
+    },
+    "nuclei": {
+      "type": "local",
+      "command": ["/home/bb/tools/claude-bug-bounty/.venv-mcp/bin/python", "/home/bb/tools/claude-bug-bounty/mcp/nuclei-mcp/server.py"],
+      "enabled": true
+    },
+    "interactsh": {
+      "type": "local",
+      "command": ["/home/bb/tools/claude-bug-bounty/.venv-mcp/bin/python", "/home/bb/tools/claude-bug-bounty/mcp/interactsh-mcp/server.py"],
+      "enabled": true
+    },
+    "shodan": {
+      "type": "local",
+      "command": ["/home/bb/tools/claude-bug-bounty/.venv-mcp/bin/python", "/home/bb/tools/claude-bug-bounty/mcp/shodan-mcp/server.py"],
+      "enabled": true
+    },
+    "vulnera-mcp": {
+      "type": "local",
+      "command": ["/home/bb/.opencode/.venv/bin/python", "/home/bb/.opencode/mcp/servers/vulnera-mcp/server.py"],
+      "enabled": true
+    },
+    "bounty-directory": {
+      "type": "local",
+      "command": ["/home/bb/.opencode/.venv/bin/python", "/home/bb/.opencode/mcp/servers/bounty-directory/server.py"],
+      "enabled": true
+    },
+    "agent-reach": {
+      "type": "local",
+      "command": ["/home/bb/.opencode/.venv/bin/python", "/home/bb/.opencode/mcp/servers/agent-reach/server.py"],
+      "enabled": true
+    },
+    // 2026 Elite Security Research: semgrep, codeql, race conditions, variant analysis, PoC generation
+    "security-research": {
+      "type": "local",
+      "command": ["/home/bb/.opencode/.venv/bin/python", "/home/bb/.opencode/mcp/servers/security-research/server.py"],
+      "enabled": true
+    },
+    // 2026 Program Intelligence: discovery, enrichment, research, scoring, change detection, knowledge graph
+    "program-intelligence": {
+      "type": "local",
+      "command": ["/home/bb/.opencode/.venv/bin/python", "/home/bb/.opencode/mcp/servers/program-intelligence-mcp/server.py"],
+      "enabled": true
+    }
+  },
+  "agent": {
+    // Default: autopilot — autonomous hunt loop agent
+    // Safety rails: scope check every URL, audit-log every request, NEVER auto-submit
+    "autopilot": {
+      "file": "/home/bb/.config/opencode/agents/autopilot.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "webfetch": "deny",
+        "websearch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // 2026 Upgrade: autopilot-hunter — anonymous bug bounty hunter with 10-step pipeline
+    // Uses vulnera-mcp, bounty-directory, and agent-reach MCP servers
+    // State persists to ~/.config/vulnera-mcp/autopilot-state.json
+    // Target rotation: round_robin, max 3 cycles per target, 300s cooldown
+    "autopilot-hunter": {
+      "file": "/home/bb/.config/opencode/agents/autopilot-hunter.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // 2026 Program Intelligence: discover, enrich, research, score, monitor programs
+    // Provides enriched inputs to autopilot-hunter — does NOT replace recon/hunt
+    "program-intelligence-agent": {
+      "file": "/home/bb/.config/opencode/agents/program-intelligence-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Exploit chain builder — chains findings A→B→C for higher severity
+    "exploit-chainer": {
+      "file": "/home/bb/.config/opencode/agents/exploit-chainer.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Deep validator — 7-question gate + 4 pre-submission gates
+    "deep-validator": {
+      "file": "/home/bb/.config/opencode/agents/deep-validator.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Secret hunter — automated credential scanning
+    "secret-hunter-agent": {
+      "file": "/home/bb/.config/opencode/agents/secret-hunter-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Mobile pentest agent — APK/iOS security testing
+    "mobile-pentest-agent": {
+      "file": "/home/bb/.config/opencode/agents/mobile-pentest-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Cloud security agent — AWS/GCP/Azure assessment
+    "cloud-security-agent": {
+      "file": "/home/bb/.config/opencode/agents/cloud-security-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // CI/CD security agent — pipeline security assessment
+    "cicd-security-agent": {
+      "file": "/home/bb/.config/opencode/agents/cicd-security-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // LLM security agent — AI/LLM application testing
+    "llm-security-agent": {
+      "file": "/home/bb/.config/opencode/agents/llm-security-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Crypto auditor agent — smart contract/token security
+    "crypto-auditor-agent": {
+      "file": "/home/bb/.config/opencode/agents/crypto-auditor-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Zero-day hunter — proactive vulnerability discovery
+    "zero-day-hunter": {
+      "file": "/home/bb/.config/opencode/agents/zero-day-hunter.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    }
+  },
+  "default_agent": "autopilot"
+}
