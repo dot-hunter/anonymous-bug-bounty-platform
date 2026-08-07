@@ -72,24 +72,56 @@ def _which(name):
     return None
 
 
-def _run(cmd, timeout=60, input=None, cwd=None):
-    """Run a command, returning (rc, stdout, stderr)."""
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            input=input,
-            cwd=cwd,
-        )
-        return proc.returncode, proc.stdout, proc.stderr
-    except FileNotFoundError:
-        return -1, "", f"{cmd[0]} not found"
-    except subprocess.TimeoutExpired:
-        return -1, "", "timed out"
-    except Exception as exc:
-        return -1, "", str(exc)
+def _run(cmd, timeout=60, input=None, cwd=None, max_retries=3, retry_delay=2):
+    """Run a command with retry logic, returning (rc, stdout, stderr).
+    
+    P0-3: Exponential backoff retry — max 3 retries, 2s/4s/8s delays.
+    Does NOT retry on: permission errors (403), timeouts, command not found.
+    """
+    last_rc, last_stdout, last_stderr = -1, "", ""
+
+    for attempt in range(max_retries):
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                input=input,
+                cwd=cwd,
+            )
+            rc = proc.returncode
+            stdout = proc.stdout
+            stderr = proc.stderr
+
+            # Success or non-retryable error
+            if rc == 0:
+                return rc, stdout, stderr
+            # Don't retry permission errors
+            if "403" in stderr or "Forbidden" in stderr:
+                return rc, stdout, stderr
+            # Don't retry not-found
+            if "not found" in stderr.lower():
+                return rc, stdout, stderr
+
+            last_rc, last_stdout, last_stderr = rc, stdout, stderr
+
+        except FileNotFoundError as e:
+            return -1, "", f"{cmd[0]} not found"
+        except subprocess.TimeoutExpired:
+            last_rc, last_stderr = -1, "timed out"
+            # Don't retry timeouts
+            return last_rc, last_stdout, last_stderr
+        except Exception as exc:
+            last_rc, last_stderr = -1, str(exc)
+
+        # Exponential backoff before retry
+        if attempt < max_retries - 1:
+            delay = retry_delay * (2 ** attempt)  # 2s, 4s, 8s
+            logger.warning(f"Retry {attempt + 1}/{max_retries} after {delay}s: {last_stderr[:100]}")
+            time.sleep(delay)
+
+    return last_rc, last_stdout, last_stderr
 
 
 # --------------------------------------------------------------------------- #

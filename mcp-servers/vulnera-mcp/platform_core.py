@@ -78,6 +78,85 @@ class LongTermMemory:
         }
         self._append(self.lessons_file, entry)
 
+    def generate_lessons_from_investigation(self, investigation: dict) -> list:
+        """P1-1: Phase G — Auto-extract lessons after investigation closes.
+        
+        Extracts:
+        - Successful workflows (which tool sequences led to findings)
+        - Failed tool invocations (what didn't work)
+        - Technology patterns (tech stacks observed)
+        - High-signal endpoints (which endpoint types yielded results)
+        - Effective hypothesis types (which hypotheses were confirmed)
+        """
+        lessons = []
+
+        # Extract from findings
+        for finding in investigation.get("findings", []):
+            if finding.get("severity") in ("high", "critical"):
+                lessons.append({
+                    "type": "successful_workflow",
+                    "category": "finding",
+                    "technology": finding.get("technology"),
+                    "attack_class": finding.get("type"),
+                    "endpoint_pattern": finding.get("url_pattern"),
+                    "tools_used": finding.get("tools"),
+                    "severity": finding.get("severity"),
+                })
+
+        # Extract from failed tools
+        for failure in investigation.get("failed_tools", []):
+            lessons.append({
+                "type": "failed_approach",
+                "category": "tool_failure",
+                "tool": failure.get("tool"),
+                "error": failure.get("error"),
+                "target_type": failure.get("target_type"),
+            })
+
+        # Extract technology patterns
+        technologies = investigation.get("technologies", [])
+        if technologies:
+            lessons.append({
+                "type": "technology_pattern",
+                "category": "observation",
+                "technologies": technologies,
+                "target": investigation.get("target"),
+            })
+
+        # Extract high-signal endpoints
+        for endpoint in investigation.get("interesting_endpoints", []):
+            lessons.append({
+                "type": "high_signal_endpoint",
+                "category": "recon",
+                "endpoint": endpoint.get("url"),
+                "type_category": endpoint.get("type"),
+                "finding_count": endpoint.get("finding_count", 0),
+            })
+
+        # Extract effective hypothesis types
+        for hypothesis in investigation.get("confirmed_hypotheses", []):
+            lessons.append({
+                "type": "effective_hypothesis",
+                "category": "hypothesis",
+                "hypothesis_type": hypothesis.get("type"),
+                "technology": hypothesis.get("technology"),
+                "confidence_delta": hypothesis.get("confidence_delta", 0),
+            })
+
+        # Store all lessons
+        for lesson in lessons:
+            self.record_lesson(lesson)
+
+        return lessons
+
+    def get_lessons_by_technology(self, technology: str, limit=20) -> list:
+        """Phase G: Retrieve lessons relevant to a technology stack."""
+        lessons = self.get_lessons(limit=limit * 3)
+        return [
+            l for l in lessons
+            if technology.lower() in str(l.get("data", {}).get("technology", "")).lower()
+        ][:limit]
+
     def record_workflow(self, workflow: dict):
         """Record a workflow outcome."""
         entry = {
@@ -195,6 +274,68 @@ class KnowledgeGraphContinuously:
             "metadata": self.metadata,
         }
         self.graph_file.write_text(json.dumps(data, indent=2, default=str))
+
+    def merge_from_file(self, source_path: str) -> dict:
+        """P0-4: Merge another knowledge graph from a JSON file into this one.
+        
+        Unifies the three fragmented graphs:
+        - ~/.config/vulnera-mcp/graph.json (operational graph)
+        - ~/.config/program-intelligence/knowledge_graph.json (program graph)
+        - ~/.config/platform/memory/knowledge_graph.json (this graph)
+        """
+        source = Path(source_path)
+        if not source.exists():
+            return {"merged": 0, "skipped": True, "reason": "file not found"}
+
+        try:
+            data = json.loads(source.read_text())
+        except (json.JSONDecodeError, OSError) as e:
+            return {"merged": 0, "skipped": True, "reason": str(e)}
+
+        source_nodes = data.get("nodes", {})
+        source_edges = data.get("edges", {})
+
+        merged_nodes = 0
+        merged_edges = 0
+
+        # Merge nodes
+        for node_id, node_data in source_nodes.items():
+            if node_id not in self.nodes:
+                self.nodes[node_id] = node_data
+                merged_nodes += 1
+            else:
+                # Update with newer data
+                existing_version = self.nodes[node_id].get("version", 0)
+                incoming_version = node_data.get("version", 0)
+                if incoming_version > existing_version:
+                    self.nodes[node_id]["data"].update(node_data.get("data", {}))
+                    self.nodes[node_id]["version"] = incoming_version
+                    merged_nodes += 1
+
+        # Merge edges
+        for source_id, targets in source_edges.items():
+            if source_id not in self.edges:
+                self.edges[source_id] = {}
+            for target_id, edge_data in targets.items():
+                if target_id not in self.edges[source_id]:
+                    self.edges[source_id][target_id] = edge_data
+                    merged_edges += 1
+
+        self._save()
+        return {"merged": merged_nodes + merged_edges, "nodes": merged_nodes, "edges": merged_edges}
+
+    def unify_all_graphs(self) -> dict:
+        """P0-4: Merge all three knowledge graphs into this canonical graph."""
+        graphs_to_merge = [
+            Path.home() / ".config" / "vulnera-mcp" / "graph.json",
+            Path.home() / ".config" / "program-intelligence" / "knowledge_graph.json",
+        ]
+        results = {}
+        for graph_path in graphs_to_merge:
+            if graph_path.exists() and str(graph_path) != str(self.graph_file):
+                result = self.merge_from_file(str(graph_path))
+                results[str(graph_path)] = result
+        return results
 
     def add_node(self, node_id: str, node_type: str, data: dict = None):
         """Add or update a node."""
@@ -576,6 +717,49 @@ class HypothesisEngine:
         ranked = self.rank_hypotheses()
         return ranked[0] if ranked else None
 
+    def update_confidence(self, hypothesis_id: str, evidence_result: dict) -> float:
+        """P1-2: Update hypothesis confidence based on evidence.
+        
+        - Positive evidence (vuln confirmed): +0.2 confidence
+        - Negative evidence (test clean): -0.1 confidence  
+        - Ambiguous (no response/timeout): no change
+        
+        Confidence is clamped to [0.0, 1.0].
+        """
+        for h in self.hypotheses:
+            if h["id"] == hypothesis_id:
+                current = h.get("confidence", 0.5)
+
+                if evidence_result.get("confirmed"):
+                    # Positive evidence — vulnerability confirmed
+                    h["confidence"] = min(1.0, current + 0.2)
+                    h["status"] = "confirmed"
+                elif evidence_result.get("clean"):
+                    # Negative evidence — test came back clean
+                    h["confidence"] = max(0.0, current - 0.1)
+                    h["status"] = "rejected"
+                else:
+                    # Ambiguous result
+                    h["status"] = "ambiguous"
+
+                h["last_evidence"] = evidence_result.get("timestamp", datetime.utcnow().isoformat())
+                return h["confidence"]
+
+        return 0.0
+
+    def link_evidence_to_hypothesis(self, hypothesis_id: str, evidence: dict):
+        """Link a piece of evidence to a hypothesis for audit trail."""
+        for h in self.hypotheses:
+            if h["id"] == hypothesis_id:
+                if "evidence_chain" not in h:
+                    h["evidence_chain"] = []
+                h["evidence_chain"].append({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "evidence": evidence,
+                })
+                return True
+        return False
+
 
 # ---------------------------------------------------------------------------
 # Phase F: Evidence-Based Reasoning
@@ -626,6 +810,81 @@ class EvidenceCollector:
         """Update confidence in a finding."""
         # This would update the finding in place in a real DB
         pass
+
+    def collect_screenshot_evidence(self, url: str, output_path: str = None) -> dict:
+        """P1-3: Capture screenshot evidence using Playwright headless browser.
+        
+        Falls back gracefully if Playwright is not installed.
+        """
+        if not output_path:
+            output_path = str(self.evidence_dir / f"screenshot_{hashlib.md5(url.encode()).hexdigest()[:12]}.png")
+
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(headless=True)
+                page = browser.new_page(viewport={"width": 1920, "height": 1080})
+                page.goto(url, timeout=15000, wait_until="domcontentloaded")
+                page.wait_for_timeout(2000)  # Wait for JS rendering
+                page.screenshot(path=output_path, full_page=True)
+                title = page.title()
+                browser.close()
+                return {
+                    "url": url,
+                    "path": output_path,
+                    "captured": True,
+                    "title": title,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+        except ImportError:
+            return {
+                "url": url,
+                "path": output_path,
+                "captured": False,
+                "error": "playwright not installed (pip install playwright && playwright install chromium)",
+            }
+        except Exception as e:
+            return {
+                "url": url,
+                "path": output_path,
+                "captured": False,
+                "error": str(e)[:200],
+            }
+
+    def collect_http_evidence(self, url: str, method="GET", headers=None, body=None) -> dict:
+        """P1-2: Collect structured HTTP evidence."""
+        import subprocess
+        cmd = ["curl", "-s", "-i", "-X", method, "--max-time", "10"]
+        if headers:
+            for k, v in headers.items():
+                cmd.extend(["-H", f"{k}: {v}"])
+        if body:
+            cmd.extend(["-d", json.dumps(body)])
+        cmd.append(url)
+
+        rc, stdout, stderr = _run(cmd, timeout=15)
+        return {
+            "url": url,
+            "method": method,
+            "response": stdout[:5000],
+            "status_code": self._extract_status(stdout),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    def _extract_status(self, response: str) -> int:
+        """Extract HTTP status code from response."""
+        if not response:
+            return 0
+        lines = response.split("\n")
+        for line in lines:
+            if line.startswith("HTTP/"):
+                parts = line.split()
+                if len(parts) >= 2:
+                    try:
+                        return int(parts[1])
+                    except ValueError:
+                        pass
+        return 0
 
 
 # ---------------------------------------------------------------------------

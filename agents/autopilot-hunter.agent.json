@@ -1,0 +1,362 @@
+{
+  "name": "autopilot-hunter",
+  "description": "2026.08 Elite Anonymous Autopilot Bug Bounty Hunter \u2014 orchestrates program selection, internet intelligence, AI security testing, anonymous recon, swarm pentesting, active testing, CTEM management, API/auth/cloud scanning, JS analysis, graph analysis, correlation, report generation, and target rotation. Powered by the security-research MCP server (semgrep, codeql, race conditions, variant analysis, PoC generation) and the 2026 master system prompt.",
+  "version": "2026.08",
+  "mode": "primary",
+  "anonymous": true,
+  "permission": {
+    "bash": "allow",
+    "edit": "allow",
+    "webfetch": "deny",
+    "websearch": "allow",
+    "task": "deny",
+    "external_directory": "deny"
+  },
+  "state": {
+    "persist_to": "~/.config/vulnera-mcp/autopilot-state.json",
+    "rotation_strategy": "round_robin",
+    "max_cycles_per_target": 3,
+    "cooldown_seconds": 300,
+    "visited_log": "~/.config/vulnera-mcp/visited.jsonl"
+  },
+  "pipeline": [
+    {
+      "step": 0,
+      "name": "intelligence_loading",
+      "description": "Load prior knowledge from memory and knowledge graph. Generate initial hypotheses to guide investigation.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "platform_knowledge_graph_query(node_type=asset)",
+        "platform_memory_search(query=target_domain)",
+        "platform_generate_hypotheses(target=selected_target, evidence=tech_fingerprint)"
+      ],
+      "output": "prior_knowledge_and_hypotheses",
+      "state_key": "intelligence_data"
+    },
+    {
+      "step": 0.5,
+      "name": "planner_initialization",
+      "description": "Initialize goal-driven planner with investigation goals based on target scope and hypotheses.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "platform_start_investigation(target=selected_target, scope=authorized_scope)",
+        "platform_get_next_action(investigation_id=current_inv_id)"
+      ],
+      "output": "investigation_plan",
+      "state_key": "planner_data"
+    },
+    {
+      "step": 1,
+      "name": "program_selection",
+      "description": "Query the bounty directory, filter by platform (HackerOne/Bugcrowd/Immunefi/independent), rank by complexity vs payout, and select the optimal target.",
+      "tool": "bounty-directory MCP",
+      "calls": [
+        "list_programs(platform=null, min_bounty=100)",
+        "rank(top_n=20)",
+        "get_program(handle=selected)"
+      ],
+      "output": "selected_target",
+      "state_key": "current_target"
+    },
+    {
+      "step": 2,
+      "name": "internet_intelligence",
+      "description": "Use Agent-Reach to gather OSINT from Twitter, Reddit, YouTube, GitHub, Bilibili, and XiaoHongShu for the selected target.",
+      "tool": "agent-reach MCP",
+      "calls": [
+        "search_twitter(query=target_name)",
+        "read_reddit(subreddit=target_name)",
+        "scrape_github(repo=target_name)",
+        "fetch_youtube(video_id=target_youtube_id)"
+      ],
+      "output": "osint_intel",
+      "state_key": "osint_data"
+    },
+    {
+      "step": 3,
+      "name": "ai_security_testing",
+      "description": "Test for AI/LLM vulnerabilities including prompt injection, jailbreak, and data extraction.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "test_prompt_injection(target=selected_target, url=base_url)",
+        "test_jailbreak(target=selected_target, url=base_url)",
+        "test_data_extraction(target=selected_target, url=base_url)"
+      ],
+      "output": "ai_security_findings",
+      "state_key": "ai_security_data"
+    },
+    {
+      "step": 4,
+      "name": "anonymous_recon",
+      "description": "Perform full reconnaissance. FIRST check memory for prior recon results (within 7 days = skip). THEN enumerate new assets. FINALLY record new assets to memory and knowledge graph.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "platform_memory_search(query=selected_target + ' recon subdomains')",
+        "recon(target=selected_target, quick=false)",
+        "subdomain_enum(target=selected_target)",
+        "live_probe(urls=discovered_urls)",
+        "platform_record_observation(observation={'type': 'recon', 'target': selected_target, 'subdomains': discovered_subdomains})",
+        "platform_checkpoint(state=current_state)"
+      ],
+      "output": "recon_results",
+      "state_key": "recon_data"
+    },
+    {
+      "step": 5,
+      "name": "swarm_pentesting",
+      "description": "Run swarm-based autonomous pentesting with multi-agent orchestration.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "swarm_run(target=selected_target)"
+      ],
+      "output": "swarm_results",
+      "state_key": "swarm_data"
+    },
+    {
+      "step": 6,
+      "name": "active_testing",
+      "description": "Run prioritized tests based on planner hypotheses. Use GET_NEXT_ACTION from planner to select tests dynamically. Record all evidence.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "platform_get_next_action(investigation_id=current_inv_id)",
+        "test_xss(target=selected_target, param=param, url=url)",
+        "test_sqli(target=selected_target, param=param, url=url)",
+        "test_idor(target=selected_target, endpoints=discovered_endpoints)",
+        "test_csp(target=selected_target, url=live_host_url)",
+        "platform_record_observation(observation={'type': 'test_result', 'url': url, 'result': test_result})",
+        "platform_checkpoint(state=current_state)"
+      ],
+      "output": "active_findings",
+      "state_key": "active_test_data"
+    },
+    {
+      "step": 7,
+      "name": "ctem_management",
+      "description": "Run Continuous Threat Exposure Management (CTEM) for the target.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "ctem_run(target=selected_target)"
+      ],
+      "output": "ctem_results",
+      "state_key": "ctem_data"
+    },
+    {
+      "step": 8,
+      "name": "api_auth_cloud_scanning",
+      "description": "Test GraphQL endpoints, rate limiting, BOLA/IDOR, Swagger docs, JWT/OAuth/Session security, and cloud bucket/secret/Terraform exposure.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "test_graphql(target=selected_target, endpoint=api_endpoint)",
+        "test_rate_limit(target=selected_target, url=api_endpoint)",
+        "test_bola(target=selected_target, endpoints=api_endpoints)",
+        "test_swagger(target=selected_target, url=base_url)",
+        "test_jwt(target=selected_target, token=extracted_token)",
+        "test_oauth(target=selected_target, auth_url=oauth_endpoint)",
+        "test_session(target=selected_target, url=base_url)",
+        "scan_s3(target=selected_target, domains=discovered_domains)",
+        "scan_secrets(target=selected_target, url=discovered_url)",
+        "scan_terraform(target=selected_target, url=base_url)"
+      ],
+      "output": "api_auth_cloud_findings",
+      "state_key": "api_auth_cloud_data"
+    },
+    {
+      "step": 9,
+      "name": "js_analysis",
+      "description": "Download, beautify, extract endpoints, and detect secrets in JavaScript files from discovered assets.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "js_analyze(url=discovered_js_url)"
+      ],
+      "output": "js_analysis_results",
+      "state_key": "js_data"
+    },
+    {
+      "step": 10,
+      "name": "graph_analysis",
+      "description": "Generate, rank, and export attack paths from the knowledge graph. Correlate all findings.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "graph_paths(target=selected_target)",
+        "graph_export(format=json)",
+        "graph_export(format=graphml)"
+      ],
+      "output": "graph_results",
+      "state_key": "graph_data"
+    },
+    {
+      "step": 11,
+      "name": "correlation",
+      "description": "Link and correlate findings across all test categories to identify compound vulnerabilities and attack chains.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "full_scan(target=selected_target, quick=false)"
+      ],
+      "output": "correlated_findings",
+      "state_key": "correlated_data"
+    },
+    {
+      "step": 12,
+      "name": "static_analysis",
+      "description": "Run Semgrep static analysis with 10 custom 2026 security rules (prototype pollution, SSRF, IDOR, TOCTOU, JWT confusion, MCP injection, unsafe deserialization) on any code repositories or files discovered during recon.",
+      "tool": "security-research MCP",
+      "calls": [
+        "run_semgrep(target_path=repo_path, rulesets=['p/owasp-top-10', 'p/r2c-security-audit'])",
+        "run_semgrep(target_path=target_app_dir, custom_rule_yaml=load_custom_rule('custom-security-2026'))"
+      ],
+      "output": "static_analysis_findings",
+      "state_key": "static_analysis_data"
+    },
+    {
+      "step": 13,
+      "name": "race_condition_testing",
+      "description": "Test for TOCTOU race conditions on single-use tokens, credit operations, and permission checks using parallel request exploitation.",
+      "tool": "security-research MCP",
+      "calls": [
+        "race_condition_test(url=target_endpoint, payload=token_payload, parallel_count=50)"
+      ],
+      "output": "race_findings",
+      "state_key": "race_data"
+    },
+    {
+      "step": 14,
+      "name": "variant_analysis",
+      "description": "Scale confirmed findings into multiple variants using custom Semgrep rule generation and GitHub code search.",
+      "tool": "security-research MCP",
+      "calls": [
+        "variant_analysis(vuln_class=confirmed_class, root_cause_description=confirmed_root_cause, confirmed_location=confirmed_location)",
+        "run_semgrep(target_path=repo_path, custom_rule_yaml=generated_rule)"
+      ],
+      "output": "variant_findings",
+      "state_key": "variant_data"
+    },
+    {
+      "step": 15,
+      "name": "weird_inventory_logging",
+      "description": "Log all anomalies, deferred items, and gadget discoveries to the session weird inventory for cross-session correlation.",
+      "tool": "security-research MCP",
+      "calls": [
+        "save_weird_log(session_id=session_id, kind=WEIRD, endpoint=endpoint, description=anomaly)",
+        "save_weird_log(session_id=session_id, kind=DEFERRED, endpoint=endpoint, description=reason, deferred=next_steps)",
+        "read_weird_inventory(session_id=session_id)"
+      ],
+      "output": "weird_inventory",
+      "state_key": "weird_data"
+    },
+    {
+      "step": 16,
+      "name": "poc_generation",
+      "description": "Generate Docker-based PoC scaffolding and report drafts for confirmed findings before human review.",
+      "tool": "security-research MCP",
+      "calls": [
+        "generate_poc_scaffold(vuln_class=confirmed_class, target_version=vuln_version, target_language=lang, title=finding_title, exploit_payload=working_payload)"
+      ],
+      "output": "poc_artifacts",
+      "state_key": "poc_data"
+    },
+    {
+      "step": 17,
+      "name": "validation_and_evidence",
+      "description": "Run each finding through the 7-Question Gate via deep-validator agent. Collect structured evidence bundles (HTTP req/res, screenshots, DNS) for findings passing confidence >= 0.65.",
+      "tool": "internal",
+      "calls": [
+        "spawn_agent(agent=deep_validator, input=finding_json)",
+        "collect_evidence_bundle(finding=validated_finding)",
+        "export_evidence_bundle(format=structured_dir, path=~/.opencode/data/reports/{program}/{timestamp}/)"
+      ],
+      "output": "validated_findings_with_evidence",
+      "state_key": "validated_data"
+    },
+    {
+      "step": 18,
+      "name": "report_generation",
+      "description": "Generate a structured draft report with confidence scores, evidence references, and suggested additional validation steps. NEVER auto-submit. Save as DRAFT only.",
+      "tool": "internal",
+      "calls": [
+        "compile_report(findings=validated_findings, include_confidence=true, include_evidence_refs=true)",
+        "export_report(format=markdown, path=~/.opencode/data/reports/{program}/{timestamp}/DRAFT.md)",
+        "export_report(format=json, path=~/.opencode/data/reports/{program}/{timestamp}/finding.json)",
+        "generate_validation_suggestions(finding=each_finding)"
+      ],
+      "output": "final_report_draft",
+      "state_key": "report"
+    },
+    {
+      "step": 19,
+      "name": "target_rotation",
+      "description": "Mark current target as visited. Record lessons learned to long-term memory. Select next target from ranked list.",
+      "tool": "internal",
+      "calls": [
+        "mark_visited(target=selected_target)",
+        "platform_record_lesson(lesson={'investigation': current_inv_id, 'successful_workflows': successful_tests, 'failed_approach': failed_tests})",
+        "platform_checkpoint(state=final_state)",
+        "select_next_target(ranked_list=ranked_programs)",
+        "persist_state()"
+      ],
+      "output": "next_target",
+      "state_key": "rotation"
+    }
+  ],
+  "loop": {
+    "enabled": true,
+    "max_cycles": 50,
+    "pause_between_cycles_seconds": 60,
+    "auto_rotate": true,
+    "stop_on_critical_findings": false,
+    "stop_on_manual_signal": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "~/.config/vulnera-mcp/autopilot.log",
+    "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  },
+  "security": {
+    "no_api_keys": true,
+    "rotating_user_agents": true,
+    "proxy_support": "optional",
+    "cookie_storage": "local_only",
+    "data_never_uploaded": true,
+    "max_request_rate_per_minute": 30
+  },
+  "mcp_servers": [
+    {
+      "name": "vulnera-mcp",
+      "command": [
+        "python3",
+        "~/.opencode/mcp/servers/vulnera-mcp/server.py"
+      ],
+      "enabled": true
+    },
+    {
+      "name": "bounty-directory",
+      "command": [
+        "python3",
+        "~/.opencode/mcp/servers/bounty-directory/server.py"
+      ],
+      "enabled": true
+    },
+    {
+      "name": "agent-reach",
+      "command": [
+        "python3",
+        "~/.opencode/mcp/servers/agent-reach/server.py"
+      ],
+      "enabled": true
+    },
+    {
+      "name": "security-research",
+      "command": [
+        "python3",
+        "~/.opencode/mcp/servers/security-research/server.py"
+      ],
+      "enabled": true
+    }
+  ],
+  "master_prompt": "~/.config/opencode/master-prompt.md",
+  "session_protocol": {
+    "pre_session": "Define target/goal/vuln-class/time, load context, tool setup",
+    "rotation_rule": "20-min rotation check, 45-min hard stop on single parameter",
+    "signal_logging": "save_weird_log for WEIRD/TESTED/DEFERRED/GADGET",
+    "post_session": "Save proxy files, update weird inventory, write Semgrep rule, run variant analysis, start PoC"
+  }
+}
