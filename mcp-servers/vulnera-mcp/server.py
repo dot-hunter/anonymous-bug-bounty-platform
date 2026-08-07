@@ -3971,5 +3971,168 @@ def platform_generate_lessons(investigation_id: str) -> list:
     return orchestrator.platform_generate_lessons(investigation_id) if _platform_loaded else []
 
 
+# ---------------------------------------------------------------------------
+# Payload Library + CVSS Guard (P0-A, P0-C)
+# ---------------------------------------------------------------------------
+
+import importlib.util as _ilu_payload
+
+# Load payload library
+_PAYLOAD_FILE = Path(__file__).resolve().parent.parent.parent / "config" / "payloads.md"
+
+def get_payloads(vuln_class: str) -> dict:
+    """Get curated payloads for a vulnerability class (P0-A: Payload library).
+    
+    Args:
+        vuln_class: Vulnerability class (xss, sqli, ssrf, idor, ssti, jwt, oauth, graphql, upload, llm)
+    
+    Returns:
+        Dict with payload list and WAF bypass ladder
+    """
+    if not _PAYLOAD_FILE.exists():
+        return {"error": "payload library not found", "payloads": []}
+
+    content = _PAYLOAD_FILE.read_text()
+    vuln_lower = vuln_class.lower()
+
+    # Map common aliases
+    alias_map = {
+        "xss": "xss",
+        "cross-site scripting": "xss",
+        "sqli": "sqli",
+        "sql injection": "sqli",
+        "ssrf": "ssrf",
+        "idor": "idor",
+        "bola": "idor",
+        "bfla": "idor",
+        "ssti": "ssti",
+        "template injection": "ssti",
+        "jwt": "jwt",
+        "oauth": "oauth",
+        "openid": "oauth",
+        "graphql": "graphql",
+        "upload": "upload",
+        "file upload": "upload",
+        "llm": "llm",
+        "prompt injection": "llm",
+    }
+
+    section = alias_map.get(vuln_lower, vuln_lower)
+
+    # Parse the markdown file to extract the relevant section
+    payloads = []
+    in_section = False
+    section_level = 0
+
+    for line in content.split("\n"):
+        # Detect section headers
+        if line.startswith("## ") and section in line.lower().replace(" ", "").replace("/", ""):
+            in_section = True
+            section_level = 2
+            continue
+        elif line.startswith("## ") and in_section:
+            break  # Next section
+        elif in_section and line.strip():
+            payloads.append(line.strip())
+
+    return {
+        "vuln_class": vuln_class,
+        "payloads": payloads[:50],  # Cap at 50 payloads
+        "count": len(payloads),
+        "source": "config/payloads.md",
+    }
+
+
+# Load CVSS guard
+_cvss_spec = _ilu.spec_from_file_location("cvss_guard", str(Path(__file__).resolve().parent / "cvss_guard.py"))
+_mod_cvss = _ilu.module_from_spec(_cvss_spec)
+try:
+    _cvss_spec.loader.exec_module(_mod_cvss)
+    _cvss_loaded = True
+except Exception:
+    _cvss_loaded = False
+
+
+@server.tool()
+def get_payloads(vuln_class: str) -> dict:
+    """Get curated payloads for a vulnerability class (P0-A: Payload library)."""
+    return get_payloads(vuln_class)
+
+
+@server.tool()
+def validate_cvss(platform: str, report: dict) -> dict:
+    """Validate CVSS version for target platform (P0-C: CVSS guard)."""
+    if not _cvss_loaded:
+        return {"valid": True, "warning": "CVSS guard not loaded"}
+    return _mod_cvss.validate_cvss_version(platform, report)
+
+
+# ---------------------------------------------------------------------------
+# P1-B: AppProfile | P1-C: Feedback Loop | P1-D: Writeup Index
+# ---------------------------------------------------------------------------
+
+# Load modules
+_app_profile_spec = _ilu.spec_from_file_location("app_profile", str(Path(__file__).resolve().parent / "app_profile.py"))
+_mod_app_profile = _ilu.module_from_spec(_app_profile_spec)
+try:
+    _app_profile_spec.loader.exec_module(_mod_app_profile)
+    _app_profile_loaded = True
+except Exception as e:
+    _app_profile_loaded = False
+    logger.error(f"Failed to load app_profile: {e}")
+
+_feedback_spec = _ilu.spec_from_file_location("feedback_loop", str(Path(__file__).resolve().parent / "feedback_loop.py"))
+_mod_feedback = _ilu.module_from_spec(_feedback_spec)
+try:
+    _feedback_spec.loader.exec_module(_mod_feedback)
+    _feedback_loaded = True
+except Exception as e:
+    _feedback_loaded = False
+    logger.error(f"Failed to load feedback_loop: {e}")
+
+_writeup_spec = _ilu.spec_from_file_location("writeup_index", str(Path(__file__).resolve().parent / "writeup_index.py"))
+_mod_writeup = _ilu.module_from_spec(_writeup_spec)
+try:
+    _writeup_spec.loader.exec_module(_mod_writeup)
+    _writeup_loaded = True
+except Exception as e:
+    _writeup_loaded = False
+    logger.error(f"Failed to load writeup_index: {e}")
+
+
+@server.tool()
+def build_app_profile(target: str, live_hosts: list, js_endpoints: list, api_schema: dict = None) -> dict:
+    """Build application profile for targeted testing (P1-B: AppProfile)."""
+    if not _app_profile_loaded:
+        return {"error": "app_profile module not loaded"}
+    return _mod_app_profile.build_app_profile(target, live_hosts, js_endpoints, api_schema)
+
+
+@server.tool()
+def record_outcome(vuln_class: str, technique: str, platform: str, outcome: str,
+                   payout: float = 0, payload: str = None, target: str = None,
+                   notes: str = None) -> dict:
+    """Record submission outcome and update technique weights (P1-C: Feedback Loop)."""
+    if not _feedback_loaded:
+        return {"error": "feedback_loop module not loaded"}
+    return _mod_feedback.record_outcome(vuln_class, technique, platform, outcome, payout, payload, target, notes)
+
+
+@server.tool()
+def search_techniques(vuln_class: str, technology: str = None, limit: int = 5) -> list:
+    """Search proven techniques by vulnerability class (P1-D: Writeup Index)."""
+    if not _writeup_loaded:
+        return []
+    return _mod_writeup.search_techniques(vuln_class, technology, limit)
+
+
+@server.tool()
+def seed_writeups() -> dict:
+    """Seed the writeup database with initial technique summaries (P1-D)."""
+    if not _writeup_loaded:
+        return {"error": "writeup_index module not loaded"}
+    return _mod_writeup.seed_database()
+
+
 if __name__ == "__main__":
     server.run(transport="stdio")

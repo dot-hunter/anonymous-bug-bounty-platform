@@ -1038,7 +1038,11 @@ class PlatformOrchestrator:
         self.events = EventBus()
         self.active_investigations = {}
         # P0-4 Fix: Unify fragmented knowledge graphs at startup
-        self.kg.unify_all_graphs()
+        try:
+            self.kg.unify_all_graphs()
+            logger.info("Knowledge graphs unified at startup")
+        except Exception as e:
+            logger.warning(f"KG unification failed (non-fatal): {e}")
 
     def start_investigation(self, target: str, scope: dict) -> dict:
         """Start a new investigation."""
