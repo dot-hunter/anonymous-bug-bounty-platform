@@ -4134,5 +4134,90 @@ def seed_writeups() -> dict:
     return _mod_writeup.seed_database()
 
 
+# ---------------------------------------------------------------------------
+# Advanced Techniques: HTTP Smuggling, CSRF, Cache, JWT, GraphQL, 403 Bypass
+# ---------------------------------------------------------------------------
+
+_smuggling_spec = _ilu.spec_from_file_location("http_smuggling", str(Path(__file__).resolve().parent / "http_smuggling.py"))
+_mod_smuggling = _ilu.module_from_spec(_smuggling_spec)
+try:
+    _smuggling_spec.loader.exec_module(_mod_smuggling)
+    _smuggling_loaded = True
+except Exception:
+    _smuggling_loaded = False
+
+_web_spec = _ilu.spec_from_file_location("web_attacks", str(Path(__file__).resolve().parent / "web_attacks.py"))
+_mod_web = _ilu.module_from_spec(_web_spec)
+try:
+    _web_spec.loader.exec_module(_mod_web)
+    _web_loaded = True
+except Exception:
+    _web_loaded = False
+
+_jwt_spec = _ilu.spec_from_file_location("jwt_advanced", str(Path(__file__).resolve().parent / "jwt_advanced.py"))
+_mod_jwt = _ilu.module_from_spec(_jwt_spec)
+try:
+    _jwt_spec.loader.exec_module(_mod_jwt)
+    _jwt_loaded = True
+except Exception:
+    _jwt_loaded = False
+
+_gql_spec = _ilu.spec_from_file_location("graphql_advanced", str(Path(__file__).resolve().parent / "graphql_advanced.py"))
+_mod_gql = _ilu.module_from_spec(_gql_spec)
+try:
+    _gql_spec.loader.exec_module(_mod_gql)
+    _gql_loaded = True
+except Exception:
+    _gql_loaded = False
+
+
+@server.tool()
+def test_http_smuggling(target: str, url: str) -> dict:
+    """Test HTTP Request Smuggling (CL.TE, TE.CL, H2.CL)."""
+    if not _smuggling_loaded:
+        return {"error": "http_smuggling module not loaded"}
+    return _mod_smuggling.test_http_smuggling(target, url)
+
+
+@server.tool()
+def test_csrf(target: str, url: str) -> dict:
+    """Test CSRF vulnerabilities (token absence, SameSite missing)."""
+    if not _web_loaded:
+        return {"error": "web_attacks module not loaded"}
+    return _mod_web.test_csrf(target, url)
+
+
+@server.tool()
+def test_cache_poisoning(target: str, url: str) -> dict:
+    """Test cache poisoning via unkeyed headers."""
+    if not _web_loaded:
+        return {"error": "web_attacks module not loaded"}
+    return _mod_web.test_cache_poisoning(target, url)
+
+
+@server.tool()
+def test_403_bypass(target: str, url: str) -> dict:
+    """Test 403 Forbidden bypass techniques."""
+    if not _web_loaded:
+        return {"error": "web_attacks module not loaded"}
+    return _mod_web.test_403_bypass(target, url)
+
+
+@server.tool()
+def test_jwt_advanced(target: str, token: str) -> dict:
+    """Test advanced JWT attacks (KID injection, JKU, algorithm confusion)."""
+    if not _jwt_loaded:
+        return {"error": "jwt_advanced module not loaded"}
+    return _mod_jwt.test_jwt_advanced(target, token)
+
+
+@server.tool()
+def test_graphql_advanced(target: str, endpoint: str) -> dict:
+    """Test GraphQL advanced attacks (batching, depth, introspection)."""
+    if not _gql_loaded:
+        return {"error": "graphql_advanced module not loaded"}
+    return _mod_gql.test_graphql_advanced(target, endpoint)
+
+
 if __name__ == "__main__":
     server.run(transport="stdio")
