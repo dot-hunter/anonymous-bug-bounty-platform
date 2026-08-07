@@ -1037,6 +1037,8 @@ class PlatformOrchestrator:
         self.reliability = ReliabilityManager()
         self.events = EventBus()
         self.active_investigations = {}
+        # P0-4 Fix: Unify fragmented knowledge graphs at startup
+        self.kg.unify_all_graphs()
 
     def start_investigation(self, target: str, scope: dict) -> dict:
         """Start a new investigation."""

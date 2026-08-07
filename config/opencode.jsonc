@@ -225,6 +225,76 @@
         "task": "deny",
         "external_directory": "deny"
       }
+    },
+    // Recon ranker — attack surface ranking
+    "recon-ranker": {
+      "file": "/home/bb/.config/opencode/agents/recon-ranker.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Chain builder — exploit chain construction
+    "chain-builder": {
+      "file": "/home/bb/.config/opencode/agents/chain-builder.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // AI recon agent — AI-powered reconnaissance
+    "ai-recon-agent": {
+      "file": "/home/bb/.config/opencode/agents/ai-recon-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Credential hunter — credential attack specialist
+    "credential-hunter": {
+      "file": "/home/bb/.config/opencode/agents/credential-hunter.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Token auditor — token security analysis
+    "token-auditor": {
+      "file": "/home/bb/.config/opencode/agents/token-auditor.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
     }
   },
   "default_agent": "autopilot"

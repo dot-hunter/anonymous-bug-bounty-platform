@@ -3864,6 +3864,15 @@ def _platform_checkpoint(self, state): return self.platform.reliability.checkpoi
 def _platform_restore(self): return self.platform.reliability.restore_checkpoint() if _platform_loaded and hasattr(self, 'platform') else {}
 def _platform_record_observation(self, obs): return self.platform.memory.record_observation(obs) if _platform_loaded and hasattr(self, 'platform') else {}
 def _platform_record_lesson(self, lesson): return self.platform.memory.record_lesson(lesson) if _platform_loaded and hasattr(self, 'platform') else {}
+def _platform_update_confidence(self, hypothesis_id, evidence_result):
+    if _platform_loaded and hasattr(self, 'platform'):
+        return self.platform.hypothesis.update_confidence(hypothesis_id, evidence_result)
+    return {}
+def _platform_generate_lessons(self, investigation_id):
+    if _platform_loaded and hasattr(self, 'platform'):
+        inv = self.platform.active_investigations.get(investigation_id, {})
+        return self.platform.memory.generate_lessons_from_investigation(inv)
+    return []
 
 ScannerOrchestrator.platform_start = _platform_start
 ScannerOrchestrator.platform_next = _platform_next
@@ -3876,6 +3885,8 @@ ScannerOrchestrator.platform_checkpoint = _platform_checkpoint
 ScannerOrchestrator.platform_restore = _platform_restore
 ScannerOrchestrator.platform_record_observation = _platform_record_observation
 ScannerOrchestrator.platform_record_lesson = _platform_record_lesson
+ScannerOrchestrator.platform_update_confidence = _platform_update_confidence
+ScannerOrchestrator.platform_generate_lessons = _platform_generate_lessons
 
 
 # Platform MCP Tools
@@ -3933,6 +3944,31 @@ def platform_record_observation(observation: dict) -> dict:
 def platform_record_lesson(lesson: dict) -> dict:
     """Record a lesson learned (Phase G: Continuous Learning)."""
     return orchestrator.platform_record_lesson(lesson) if _platform_loaded else {}
+
+@server.tool()
+def platform_update_confidence(hypothesis_id: str, evidence_result: dict) -> dict:
+    """Update hypothesis confidence based on evidence (Phase F: Confidence Feedback).
+    
+    Args:
+        hypothesis_id: ID of the hypothesis to update
+        evidence_result: Dict with 'confirmed' (bool), 'clean' (bool), or neither for ambiguous
+    
+    Returns:
+        Updated confidence score and status
+    """
+    return orchestrator.platform_update_confidence(hypothesis_id, evidence_result) if _platform_loaded else {}
+
+@server.tool()
+def platform_generate_lessons(investigation_id: str) -> list:
+    """Auto-extract lessons from a completed investigation (Phase G: Continuous Learning).
+    
+    Args:
+        investigation_id: ID of the investigation to extract lessons from
+    
+    Returns:
+        List of extracted lesson dicts
+    """
+    return orchestrator.platform_generate_lessons(investigation_id) if _platform_loaded else []
 
 
 if __name__ == "__main__":
