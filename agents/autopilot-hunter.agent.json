@@ -102,6 +102,18 @@
       "state_key": "recon_data"
     },
     {
+      "step": 4.5,
+      "name": "app_profiling",
+      "description": "Build structured AppProfile from recon output. Maps tech stack, trust boundaries, high-value parameters, auth mechanisms, and API versions. Feeds directly into hypothesis generation to convert generic templates into targeted, flow-aware hypotheses.",
+      "tool": "vulnera-mcp MCP",
+      "calls": [
+        "build_app_profile(target=selected_target, live_hosts=recon_data.live_hosts, js_endpoints=recon_data.js_endpoints, api_schema=recon_data.api_schema)",
+        "platform_generate_hypotheses(target=selected_target, evidence=app_profile_output)"
+      ],
+      "output": "app_profile_and_hypotheses",
+      "state_key": "app_profile_data"
+    },
+    {
       "step": 5,
       "name": "swarm_pentesting",
       "description": "Run swarm-based autonomous pentesting with multi-agent orchestration.",

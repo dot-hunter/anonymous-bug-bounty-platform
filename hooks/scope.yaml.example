@@ -1,0 +1,9 @@
+program: example-program
+platform: hackerone
+in_scope:
+  - "*.example.com"
+  - "example.com"
+out_of_scope:
+  - "careers.example.com"
+  - "shop.example.com"
+  - "*.cloudflare.com"

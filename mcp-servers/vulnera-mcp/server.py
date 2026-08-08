@@ -4099,6 +4099,18 @@ except Exception as e:
     _writeup_loaded = False
     logger.error(f"Failed to load writeup_index: {e}")
 
+# Auto-seed writeup index on first run (Gap A fix)
+if _writeup_loaded:
+    try:
+        _wu_stats = _mod_writeup.get_stats()
+        if _wu_stats.get("total_writeups", 0) == 0:
+            _seed_result = _mod_writeup.seed_database()
+            logger.info(f"Writeup index auto-seeded: {_seed_result}")
+        else:
+            logger.info(f"Writeup index already populated: {_wu_stats.get('total_writeups')} entries")
+    except Exception as _seed_exc:
+        logger.warning(f"Writeup index auto-seed failed: {_seed_exc}")
+
 
 @server.tool()
 def build_app_profile(target: str, live_hosts: list, js_endpoints: list, api_schema: dict = None) -> dict:

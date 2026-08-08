@@ -573,6 +573,47 @@ class GoalDrivenPlanner:
             "estimated_time": 600,
         })
 
+        # NEW (Gap C fix): Boost priority of techniques with positive historical outcomes
+        try:
+            import importlib.util as _ilu_fb
+            _fb_spec = _ilu_fb.spec_from_file_location(
+                "feedback_loop",
+                str(Path(__file__).resolve().parent / "feedback_loop.py"),
+            )
+            _mod_fb = _ilu_fb.module_from_spec(_fb_spec)
+            _fb_spec.loader.exec_module(_mod_fb)
+            if hasattr(_mod_fb, "get_technique_weights"):
+                weights = _mod_fb.get_technique_weights(limit=50)
+                weight_map = {}
+                for w in weights:
+                    key = (w.get("vuln_class", ""), w.get("platform", ""))
+                    weight_map[key] = w.get("weight", 1.0)
+                platform = scope.get("platform", "")
+                boosted = 0
+                for goal in goals:
+                    # Goal tools imply a vuln class; map tool name -> vuln class
+                    tool_vuln_map = {
+                        "test_idor": "idor", "bola_direct_id": "idor", "api_bfla": "bfla",
+                        "test_xss": "xss", "test_sqli": "sqli", "test_ssrf": "ssrf",
+                        "test_oauth": "oauth", "test_jwt": "jwt", "test_graphql": "graphql",
+                        "test_ssti": "ssti", "test_rce": "rce", "test_lfi": "lfi",
+                        "test_race": "race", "test_file_upload": "file_upload",
+                    }
+                    for tool in goal.get("tools", []):
+                        vc = tool_vuln_map.get(tool)
+                        if not vc:
+                            continue
+                        key = (vc, platform)
+                        if key in weight_map and weight_map[key] > 1.0:
+                            goal["priority"] = goal.get("priority", 5) * weight_map[key]
+                            goal["weighted_by_outcome"] = True
+                            boosted += 1
+                            break
+                if boosted:
+                    logger.info(f"GoalDrivenPlanner: boosted {boosted} goals using technique outcome weights")
+        except Exception as _fb_exc:
+            logger.debug(f"Technique weight boosting skipped: {_fb_exc}")
+
         self.goals = goals
         self._save_state()
         return goals
