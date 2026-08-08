@@ -133,6 +133,8 @@ class WordPressFingerprinter:
                     result["is_wordpress"] = True
                     result["detected_paths"].append(url + "/wp-content/")
                     for slug in found:
+                        if not re.match(r"^[a-zA-Z0-9_-]{2,80}$", slug):
+                            continue
                         if slug not in result["themes"] and slug not in result["plugins"]:
                             # wp-content/themes/<slug> vs wp-content/plugins/<slug>
                             if f"/wp-content/themes/{slug}/" in text:
