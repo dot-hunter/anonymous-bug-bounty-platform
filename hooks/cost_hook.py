@@ -1,3 +1,8 @@
+"""
+SUPERSEDED (2026-08-08): opencode 1.18+ removed the `hooks` config key.
+Use /home/bb/.config/opencode/plugin/security-hooks.js instead (registered via
+"plugin" array in opencode.jsonc). This file is kept as reference only.
+"""
 #!/usr/bin/env python3
 """SubagentStop hook — logs agent name + token cost to cost-tracking.jsonl.
 Called by OpenCode after each subagent completes.
