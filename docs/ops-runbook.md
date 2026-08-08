@@ -17,7 +17,7 @@ opencode "autopilot-hunter: run full cycle"
 
 Pre-flight checklist:
 - [ ] `scope.yaml` populated at `~/.config/vulnera-mcp/scope.yaml` (copy from `scope.yaml.example`)
-- [ ] **Hooks installed**: `cp hooks/cost_hook.py hooks/scope_hook.py /home/bb/hooks/` — `opencode.jsonc` registers hooks at `/home/bb/hooks/`, while the repo stores them at `./hooks/`. Copy them into place during install or the hooks silently no-op.
+- [ ] **Plugin installed**: `opencode.jsonc` registers `"plugin": [".../plugin/security-hooks.js"]` — this supplies `tool.execute.before` (scope enforcement) and `session.idle` (cost tracking). The legacy Python hooks in `./hooks/` (cost_hook.py, scope_hook.py) remain as reference; they are NOT wired into the config since opencode 1.18+ dropped the `hooks` key. The plugin reads `~/.config/vulnera-mcp/scope.yaml` — create it from `hooks/scope.yaml.example` or the hooks silently no-op.
 - [ ] VPN active + rotated (30-min rotation confirmed)
 - [ ] `~/.config/vulnera-mcp/STOP` does NOT exist (remove if a previous halt signal is present)
 - [ ] Session state clean: `cat ~/.config/vulnera-mcp/autopilot-state.json`
@@ -117,7 +117,7 @@ To permanently ban a target: add its domains to `out_of_scope` in `scope.yaml`.
 | Verify servers compile | `python3 -m py_compile <server>.py` | after any edit |
 | Check tool count | import server; count tools | after any edit |
 | Re-seed writeup index | delete `~/.config/platform/writeups.db`, restart server | when index empty |
-| Verify hooks fire | feed JSON to `hooks/*.py` manually | after config change |
+| Verify hooks fire | run `node --check plugin/security-hooks.js`; feed JSON to `hooks/*.py` manually | after config change |
 | Purge stale state | remove `~/.config/vulnera-mcp/autopilot-state.json` | when starting fresh campaign |
 | Update payload library | edit `~/.config/opencode/payloads.md` | continuous |
 
@@ -125,9 +125,10 @@ To permanently ban a target: add its domains to `out_of_scope` in `scope.yaml`.
 
 | Symptom | Fix |
 |---------|-----|
-| `Scope violation` in audit log | Check `scope.yaml`; the PreToolUse hook blocked the command — expected behavior |
+| `Scope violation` in audit log | Check `scope.yaml`; the PreToolUse hook (plugin `tool.execute.before`) blocked the command — expected behavior |
 | Dashboard shows 0 KG nodes | `platform_knowledge_graph_query` hasn't run yet; run a recon stage first |
-| `Cost: $0` | cost_hook.py not fired (subagents not used yet) or log path mismatch |
+| `Cost: $0` | `session.idle` plugin event not fired yet (no completed session) or log path mismatch |
 | Autopilot stuck on same target | check `autopilot-state.json` `cycle`; force rotate |
-| Hooks not blocking | verify `hooks` block in `opencode.jsonc` and hook scripts are executable |
+| Hooks not blocking | verify `"plugin"` array in `opencode.jsonc` points at `plugin/security-hooks.js` and `~/.config/vulnera-mcp/scope.yaml` exists |
 | Writeup index 0 entries | auto-seed runs at server startup; if DB was deleted mid-run, restart the server |
+| `Unrecognized key: hooks` on start | opencode 1.18+ dropped the `hooks` config key; hooks live in `plugin/security-hooks.js` (see `config/opencode.jsonc`) |

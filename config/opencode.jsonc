@@ -2,11 +2,9 @@
   "$schema": "https://opencode.ai/config.json",
   // Anonymous autopilot default: opencode's built-in free model — no API keys.
   "model": "opencode/ling-3.0-flash-free",
-  // Hooks: cost tracking on subagent completion + out-of-scope command blocking.
-  "hooks": {
-    "SubagentStop": "python3 /home/bb/hooks/cost_hook.py",
-    "PreToolUse": "python3 /home/bb/hooks/scope_hook.py"
-  },
+  // Security hooks via native plugin system (tool.execute.before = scope block,
+  // session.idle = cost tracking). Scope file: ~/.config/vulnera-mcp/scope.yaml
+  "plugin": ["/home/bb/.config/opencode/plugin/security-hooks.js"],
   "mcp": {
     "hackerone": {
       "type": "local",
