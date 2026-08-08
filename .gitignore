@@ -40,3 +40,4 @@ config/gh/
 *.tar.gz
 *.zip
 *.tar
+tools/*/__pycache__/

@@ -239,6 +239,18 @@ Full vulnerability assessment engine:
 
 ## 🔬 Advanced Features
 
+### 🧰 Offensive Toolbox (`tools/`)
+
+Readymade offensive tooling, zero external deps required:
+
+| tool | purpose |
+|------|---------|
+| `tools/xss2shell/` | XSS → interactive browser shell: payload generator + long-poll beacon listener (cookies, keylog, same-origin HTTP, JS eval, redirect) — stdlib only |
+| `tools/github-keys/` | One-liner server access from `github.com/<user>.keys` + team onboarding that auto-pulls keys for an entire GitHub org |
+| `tools/ssh-playground/` | Public SSH server that greets you by GitHub username — captures offered pubkey fingerprints (never accepts), whoami.filippo.io style (paramiko) |
+| `tools/key-trends/` | Key-type trend visualizer — RSA vs Ed25519 over years from GitHub public keys (`created_at`), SVG/ASCII output, no matplotlib |
+| `tools/pair-tunnel/` | Instant pair-programming tunnels without sharing keys manually — access derived from GitHub-published keys, ephemeral authorized_keys |
+
 ### BOLA — 10 IDOR Patterns
 1. Direct ID manipulation (sequential/UUID)
 2. Body parameter IDOR
@@ -296,6 +308,12 @@ anonymous-bug-bounty-platform/
 ├── agents/                      # 21 agent definitions
 ├── commands/                    # 27 slash commands
 ├── skills/                      # 13 skill manifests
+├── tools/                       # Offensive toolbox
+│   ├── xss2shell/              # XSS -> interactive browser shell
+│   ├── github-keys/            # 1-liner SSH access + org onboarding
+│   ├── ssh-playground/         # SSH server that greets by GitHub user
+│   ├── key-trends/              # RSA vs Ed25519 trend visualizer
+│   └── pair-tunnel/             # pair-programming tunnels, no key sharing
 ├── docs/                        # Audit reports
 │   ├── deep-audit-report.md
 │   ├── phase-a-architecture-audit.md
