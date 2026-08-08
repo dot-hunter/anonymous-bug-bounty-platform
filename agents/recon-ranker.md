@@ -90,3 +90,47 @@ If no age signal is available, omit from ranking (don't guess).
 3. If a pattern from another target matches this tech stack, boost priority and note the pattern.
 4. GraphQL endpoints are always P1. WebSocket endpoints are always P1.
 5. Admin panels behind auth are P2 (need creds). Unauthenticated admin panels are P1.
+
+## WordPress Target Ranking
+
+When a target runs WordPress (detected via `program-intelligence fingerprint_asset`),
+apply the WordPress-specific scoring model to order sub-targets. This is a
+**supplemental signal** layered on top of the general ranking table above.
+
+Use `program-intelligence rank_wordpress_targets --handle <handle>` to compute
+scores, or apply the model manually:
+
+| Component | Points |
+|---|---|
+| WordPress in scope (base) | +30 |
+| Per detected plugin | +5 (cap +20) |
+| Theme detected | +5 |
+| REST API enabled | +10 |
+| Login page exposed | +10 |
+| Program offers bounties | +15 |
+| Wildcard scope entry | +5 |
+| **Cap** | **100** |
+
+Interpretation:
+- **Score ≥ 70** → P1. Heavy plugin surface + REST + login page means many
+  plugin-CVE and auth-testing opportunities. Start here.
+- **Score 40–69** → P2. Standard WordPress install. Prioritize plugin CVEs,
+  `wp-json` enumeration, and any custom endpoints found in JS.
+- **Score < 40** → P3. Minimal surface (no plugins, no REST, no login).
+  Only test if nothing else remains.
+
+WordPress-specific technique hints (map to hunt skills):
+- Plugin version → known CVE lookup (wpvulndb-style data) → exploit if in scope
+- `wp-json/wp/v2/users` — user enumeration (authorization permitting)
+- `wp-login.php` — password spraying is NOT authorized; check for user
+  enumeration only
+- XML-RPC (`xmlrpc.php`) — check if enabled; pingback SSRF historically relevant
+- REST API namespace enumeration — custom endpoints often have IDOR/access
+  control bugs
+- Upload endpoints (`wp-json/wp/v2/media`) — authorization checks
+- Any custom plugin discovered via `readme.txt` probing — inspect for weak
+  input handling
+
+Safety: only fingerprint assets with verdict `in_scope` from
+`resolve_authorization`. Fingerprinting is passive (readme.txt/style.css
+metadata only).

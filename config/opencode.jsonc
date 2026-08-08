@@ -5,6 +5,13 @@
   // Security hooks via native plugin system (tool.execute.before = scope block,
   // session.idle = cost tracking). Scope file: ~/.config/vulnera-mcp/scope.yaml
   "plugin": ["/home/bb/.config/opencode/plugin/security-hooks.js"],
+  // Authorized Discovery (program-intelligence extension):
+  // Policy for providers (hackerone/bugcrowd/intigriti/yeswehack/securitytxt),
+  // WordPress fingerprinting limits, and read-only boundaries lives in
+  // config/authorized_discovery.jsonc (source) synced to
+  // ~/.config/program-intelligence/authorized_discovery.json (runtime).
+  // NOTE: opencode 1.18 rejects unknown top-level keys, so this is NOT a
+  // top-level "authorized_discovery" key here — it is a standalone file.
   "mcp": {
     "hackerone": {
       "type": "local",

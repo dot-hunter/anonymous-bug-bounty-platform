@@ -36,6 +36,13 @@ from memory.memory_store import MemoryStore
 from adapters.adapter_registry import AdapterRegistry
 from models.program import Program, ProgramSchema
 
+# Authorized-discovery extension (providers, scope, WordPress, ranking)
+import providers
+from normalizer import ScopeNormalizer
+from resolver import AuthorizationResolver
+from wordpress import WordPressFingerprinter
+from ranker import WordPressRanker
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -719,6 +726,237 @@ def _query_graph(
                     break
 
     return results
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# AUTHORIZED DISCOVERY EXTENSION TOOLS
+# (providers, scope normalization, authorization resolution, WordPress)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@server.tool(
+    name="normalize_scope",
+    description="Normalize a program's scope into canonical form: domains, wildcards, assets, subdomains, out_of_scope. Purely syntactic, no testing.",
+)
+def normalize_scope(scope: dict | list | None = None, program: dict | None = None) -> dict:
+    """Normalize heterogeneous scope input into a canonical dict."""
+    try:
+        if scope is None and program is None:
+            return {"status": "error", "error": "Provide either scope or program"}
+        raw = program or {}
+        if scope is None:
+            scope = raw.get("scope")
+        normalized = ScopeNormalizer.normalize_scope(scope, raw)
+        return {"status": "ok", "normalized_scope": normalized}
+    except Exception as exc:
+        logger.error("normalize_scope error: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
+@server.tool(
+    name="resolve_authorization",
+    description="Determine whether a target (hostname or URL) is authorized by a program's scope. Returns verdict: in_scope | out_of_scope | unknown with matching rule.",
+)
+def resolve_authorization(handle: str | None = None, target: str = "", program: dict | None = None) -> dict:
+    """Resolve target authorization against a program's scope."""
+    try:
+        if program is None:
+            if not handle:
+                return {"status": "error", "error": "Provide handle or program"}
+            prog = discovery.get_program(handle)
+            if not prog:
+                return {"status": "not_found", "handle": handle}
+            program = prog
+        if not target:
+            return {"status": "error", "error": "target is required"}
+        verdict = AuthorizationResolver.resolve_authorization(program, target)
+        return {
+            "status": "ok",
+            "handle": program.get("handle"),
+            "authorization": verdict,
+        }
+    except Exception as exc:
+        logger.error("resolve_authorization error: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
+@server.tool(
+    name="fingerprint_asset",
+    description="Fingerprint a single authorized asset for WordPress: version, REST API, login page, plugins, themes. Only call on targets resolved in_scope.",
+)
+def fingerprint_asset(url: str = "", authorized: bool = False) -> dict:
+    """Fingerprint one asset (must be authorized first)."""
+    try:
+        if not url:
+            return {"status": "error", "error": "url is required"}
+        if not authorized:
+            return {
+                "status": "error",
+                "error": "Not authorized. Use resolve_authorization first; pass authorized=True only for in_scope targets.",
+            }
+        fp = WordPressFingerprinter(authorized=True).fingerprint(url, authorized=True)
+        fp["status"] = "ok"
+        return fp
+    except Exception as exc:
+        logger.error("fingerprint_asset error: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
+@server.tool(
+    name="find_wordpress_assets",
+    description="Fingerprint all in-scope domains/wildcards of a program for WordPress. Only authorized in-scope targets are probed.",
+)
+def find_wordpress_assets(handle: str = "", max_targets: int = 25) -> dict:
+    """Find WordPress assets across a program's in-scope domains and wildcard hosts."""
+    try:
+        if not handle:
+            return {"status": "error", "error": "handle is required"}
+        prog = discovery.get_program(handle)
+        if not prog:
+            return {"status": "not_found", "handle": handle}
+
+        scope = ScopeNormalizer.normalize_scope(prog.get("scope"), prog)
+        candidates: list[str] = []
+
+        # Exact domains are directly in scope.
+        candidates.extend(d for d in scope.get("domains", []) if d)
+
+        # Wildcards: probe the bare apex as the first candidate.
+        for wc in scope.get("wildcards", []):
+            apex = wc[2:] if wc.startswith("*.") else wc
+            if apex and apex not in candidates:
+                candidates.append(apex)
+
+        # Subdomains discovered previously.
+        candidates.extend(s for s in scope.get("subdomains", []) if s not in candidates)
+
+        candidates = candidates[:max_targets]
+        fp = WordPressFingerprinter(authorized=True, probe_plugins=True)
+        results = []
+        for target in candidates:
+            if not target:
+                continue
+            fingerprint = fp.fingerprint(target, authorized=True)
+            if fingerprint.get("is_wordpress"):
+                results.append(fingerprint)
+
+        return {
+            "status": "ok",
+            "handle": handle,
+            "targets_probed": len(candidates),
+            "wordpress_found": len(results),
+            "assets": results,
+        }
+    except Exception as exc:
+        logger.error("find_wordpress_assets error: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
+@server.tool(
+    name="rank_wordpress_targets",
+    description="Score and rank a program's WordPress targets. Base +30, +5/plugin (cap +20), +5 theme, +10 REST, +10 login, +15 bounty, +5 wildcard; cap 100.",
+)
+def rank_wordpress_targets(handle: str = "", max_targets: int = 25) -> dict:
+    """Rank WordPress targets for a program by exploit-relevant features."""
+    try:
+        if not handle:
+            return {"status": "error", "error": "handle is required"}
+        prog = discovery.get_program(handle)
+        if not prog:
+            return {"status": "not_found", "handle": handle}
+
+        found = find_wordpress_assets(handle, max_targets=max_targets)
+        if found.get("status") != "ok":
+            return found
+        assets = found.get("assets", [])
+
+        ranked = WordPressRanker.rank_program_targets(prog, assets)
+        return {
+            "status": "ok",
+            "handle": handle,
+            "wordpress_count": len(ranked),
+            "ranked_targets": ranked,
+        }
+    except Exception as exc:
+        logger.error("rank_wordpress_targets error: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
+@server.tool(
+    name="get_target_provenance",
+    description="Get provenance for a program's scope data: which provider/source contributed each entry, confidence, and last update.",
+)
+def get_target_provenance(handle: str = "") -> dict:
+    """Return scope provenance for a program."""
+    try:
+        if not handle:
+            return {"status": "error", "error": "handle is required"}
+        prog = discovery.get_program(handle)
+        if not prog:
+            return {"status": "not_found", "handle": handle}
+
+        scope = ScopeNormalizer.normalize_scope(prog.get("scope"), prog)
+        source = prog.get("source", "unknown")
+        platform = prog.get("platform", "unknown")
+        confidence = prog.get("confidence", 0.5)
+
+        provenance = {
+            "handle": handle,
+            "platform": platform,
+            "source": source,
+            "confidence": confidence,
+            "last_updated": prog.get("last_updated"),
+            "scope_entry_count": {
+                "domains": len(scope.get("domains", [])),
+                "wildcards": len(scope.get("wildcards", [])),
+                "assets": len(scope.get("assets", [])),
+                "out_of_scope": len(scope.get("out_of_scope", [])),
+            },
+        }
+
+        # If source is a provider, annotate it.
+        if str(source).startswith("provider:"):
+            provider_name = str(source).split(":", 1)[-1]
+            provenance["provider"] = provider_name
+            provenance["note"] = (
+                f"Data mirrored from {provider_name} public program page via "
+                "authorized-discovery dataset (24h cache)."
+            )
+
+        # Memory may hold research provenance.
+        mem = memory_store.get("research", handle)
+        if mem:
+            provenance["research_notes"] = mem
+
+        return {"status": "ok", "provenance": provenance}
+    except Exception as exc:
+        logger.error("get_target_provenance error: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
+@server.tool(
+    name="get_scope_changes",
+    description="Get scope changes for a program from the change history log (additions, removals, reward changes).",
+)
+def get_scope_changes(handle: str = "", limit: int = 20) -> dict:
+    """Return scope change history for a program."""
+    try:
+        changes = change_detector.get_history(limit=limit)
+        if handle:
+            filtered = []
+            for change in changes:
+                if change.get("handle") == handle or change.get("program") == handle:
+                    filtered.append(change)
+            changes = filtered
+        return {
+            "status": "ok",
+            "handle": handle or "all",
+            "changes_found": len(changes),
+            "changes": changes,
+        }
+    except Exception as exc:
+        logger.error("get_scope_changes error: %s", exc)
+        return {"status": "error", "error": str(exc)}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

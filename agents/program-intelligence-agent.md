@@ -67,6 +67,50 @@ program-intelligence save_memory --memory_type pattern --key "<pattern-name>" --
 program-intelligence search_memory --memory_type success --query "<target>"
 ```
 
+### 8. AUTHORIZED DISCOVERY (WordPress program intelligence)
+The authorized-discovery extension adds provider-based program discovery plus
+scope normalization, authorization resolution, WordPress fingerprinting, and
+WordPress target ranking. **Never fingerprint a target before resolving
+authorization.**
+
+```
+# Discover programs from public provider datasets (HackerOne, Bugcrowd,
+# Intigriti, YesWeHack, security.txt). Uses 24h local caches — passive only.
+program-intelligence discover_programs --connector all --max_results 20
+
+# Normalize a program's scope into canonical domains/wildcards/assets/oos form
+program-intelligence normalize_scope --scope '{"domains": ["acme.com"], "wildcards": ["*.acme.com"]}'
+
+# Resolve whether a target is authorized (in_scope/out_of_scope/unknown)
+program-intelligence resolve_authorization --handle <handle> --target www.acme.com
+
+# Fingerprint an AUTHORIZED asset for WordPress (version, REST, login, plugins)
+program-intelligence fingerprint_asset --url https://www.acme.com --authorized true
+
+# Find all WordPress assets across a program's in-scope domains/wildcards
+program-intelligence find_wordpress_assets --handle <handle>
+
+# Rank WordPress targets by exploit-relevant features (score 0-100)
+program-intelligence rank_wordpress_targets --handle <handle>
+
+# Get provenance: which provider/source contributed each scope entry
+program-intelligence get_target_provenance --handle <handle>
+
+# Get scope changes for a specific program
+program-intelligence get_scope_changes --handle <handle>
+```
+
+**WordPress ranking model** (cap 100):
+| Component | Points |
+|---|---|
+| WordPress in scope (base) | +30 |
+| Per detected plugin | +5 (cap +20) |
+| Theme detected | +5 |
+| REST API enabled | +10 |
+| Login page exposed | +10 |
+| Program offers bounties | +15 |
+| Wildcard scope entry | +5 |
+
 ## Output Format
 
 Produce a Program Intelligence Brief:
@@ -120,6 +164,9 @@ Memory (patterns)      → Phase 4 (Hunt) — technique selection
 5. Change detection is COMPARATIVE — establish baseline first
 6. Memory is ADDITIVE — never delete, only append
 7. You do NOT submit reports — you enable better hunting
+8. **Authorization BEFORE fingerprinting** — call `resolve_authorization` first; only fingerprint targets with verdict `in_scope`
+9. **Providers are authorized discovery** — they read publicly published program scope data only; never send credentials
+10. **WordPress fingerprinting is passive** — no payloads, no exploitation, no auth bypass attempts; probe only readme.txt/style.css metadata files
 
 ## Session End
 At the end of each session, output:

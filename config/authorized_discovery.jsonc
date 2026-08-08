@@ -1,0 +1,43 @@
+{
+  // Authorized Discovery Configuration
+  // ==================================
+  // Governs the program-intelligence MCP authorized-discovery extension.
+  //
+  // WHY STANDALONE: opencode 1.18 rejects unknown top-level keys in
+  // opencode.jsonc (the legacy "hooks" key was removed for this reason).
+  // This file is the machine-readable home of the authorized_discovery
+  // block; opencode.jsonc references it via comment only.
+  //
+  // Runtime copy: ~/.config/program-intelligence/authorized_discovery.json
+  // (JSON, comments stripped — loaded by providers/config loader).
+
+  "providers": {
+    // Which providers are enabled. All five are read-only, public-data
+    // discovery sources; disable any you don't want polluting the DB.
+    "hackerone": { "enabled": true },
+    "bugcrowd": { "enabled": true },
+    "intigriti": { "enabled": true },
+    "yeswehack": { "enabled": true },
+    "securitytxt": { "enabled": true },
+    // Cache freshness window in seconds (default 86400 = 24h).
+    "cache_ttl": 86400
+  },
+
+  "fingerprinting": {
+    // Passive WordPress fingerprinting across a program's in-scope assets.
+    "enabled": true,
+    // Maximum readme.txt/style.css probes per asset (keeps traffic light).
+    "max_plugin_probes": 10,
+    "max_theme_probes": 5,
+    // Request timeout per probe (seconds).
+    "timeout": 10,
+    // Hard stop: never fingerprint without an in_scope authorization verdict.
+    "require_authorization": true
+  },
+
+  "policy": {
+    // Declared operational boundaries for the extension.
+    "read_only_discovery": true,   // providers never send credentials or test
+    "passive_fingerprinting": true // no payloads, no exploitation, no spraying
+  }
+}
