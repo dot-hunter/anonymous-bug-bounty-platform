@@ -300,6 +300,66 @@
         "task": "deny",
         "external_directory": "deny"
       }
+    },
+    // Recon agent — subdomain enumeration and live host discovery specialist
+    // Spawned by pipeline stages 4 (anonymous_recon) and 2 (OSINT)
+    "recon-agent": {
+      "file": "/home/bb/.config/opencode/agents/recon-agent.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Report writer — platform-formatted draft reports (H1/Bugcrowd/Intigriti/Immunefi)
+    // Validator-only role: reads findings, writes DRAFT.md, never scans
+    "report-writer": {
+      "file": "/home/bb/.config/opencode/agents/report-writer.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "deny",
+        "webfetch": "deny",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Validator — 7-Question Gate + 4 pre-submission gates
+    // Runs before any report generation; kills weak/theoretical findings
+    "validator": {
+      "file": "/home/bb/.config/opencode/agents/validator.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "deny",
+        "webfetch": "deny",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
+    // Web3 auditor — smart contract security (10 bug classes, rug pull detection)
+    // Read-only auditor: analyzes contracts, never sends transactions
+    "web3-auditor": {
+      "file": "/home/bb/.config/opencode/agents/web3-auditor.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
     }
   },
   "default_agent": "autopilot"

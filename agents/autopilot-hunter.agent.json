@@ -131,10 +131,15 @@
       "tool": "vulnera-mcp MCP",
       "calls": [
         "platform_get_next_action(investigation_id=current_inv_id)",
+        "search_techniques(vuln_class=hypothesis.class, technology=tech_stack, limit=5)",
         "test_xss(target=selected_target, param=param, url=url)",
+        "platform_update_confidence(hypothesis_id=hypothesis.id, evidence_result={'confirmed': xss_result.vulnerable, 'clean': not xss_result.vulnerable})",
         "test_sqli(target=selected_target, param=param, url=url)",
+        "platform_update_confidence(hypothesis_id=hypothesis.id, evidence_result={'confirmed': sqli_result.vulnerable, 'clean': not sqli_result.vulnerable})",
         "test_idor(target=selected_target, endpoints=discovered_endpoints)",
+        "platform_update_confidence(hypothesis_id=hypothesis.id, evidence_result={'confirmed': idor_result.vulnerable, 'clean': not idor_result.vulnerable})",
         "test_csp(target=selected_target, url=live_host_url)",
+        "platform_update_confidence(hypothesis_id=hypothesis.id, evidence_result={'confirmed': csp_result.vulnerable, 'clean': not csp_result.vulnerable})",
         "platform_record_observation(observation={'type': 'test_result', 'url': url, 'result': test_result})",
         "platform_checkpoint(state=current_state)"
       ],
@@ -308,6 +313,7 @@
       "description": "Mark current target as visited. Record lessons learned to long-term memory. Select next target from ranked list.",
       "tool": "internal",
       "calls": [
+        "platform_generate_lessons(investigation_id=current_inv_id)",
         "mark_visited(target=selected_target)",
         "platform_record_lesson(lesson={'investigation': current_inv_id, 'successful_workflows': successful_tests, 'failed_approach': failed_tests})",
         "platform_checkpoint(state=final_state)",

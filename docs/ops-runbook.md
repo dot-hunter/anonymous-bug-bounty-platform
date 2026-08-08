@@ -17,6 +17,7 @@ opencode "autopilot-hunter: run full cycle"
 
 Pre-flight checklist:
 - [ ] `scope.yaml` populated at `~/.config/vulnera-mcp/scope.yaml` (copy from `scope.yaml.example`)
+- [ ] **Hooks installed**: `cp hooks/cost_hook.py hooks/scope_hook.py /home/bb/hooks/` — `opencode.jsonc` registers hooks at `/home/bb/hooks/`, while the repo stores them at `./hooks/`. Copy them into place during install or the hooks silently no-op.
 - [ ] VPN active + rotated (30-min rotation confirmed)
 - [ ] `~/.config/vulnera-mcp/STOP` does NOT exist (remove if a previous halt signal is present)
 - [ ] Session state clean: `cat ~/.config/vulnera-mcp/autopilot-state.json`
