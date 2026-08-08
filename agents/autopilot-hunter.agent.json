@@ -257,26 +257,35 @@
     {
       "step": 17,
       "name": "validation_and_evidence",
-      "description": "Run each finding through the 7-Question Gate via deep-validator agent. Collect structured evidence bundles (HTTP req/res, screenshots, DNS) for findings passing confidence >= 0.65.",
+      "description": "Run each finding through the 7-Question Gate via deep-validator agent. HARD GATE: findings with gate != PASS are LOGGED TO KILL FILE and EXCLUDED from report generation. Only findings with gate=PASS AND confidence >= 0.65 proceed to step 18.",
       "tool": "internal",
       "calls": [
         "spawn_agent(agent=deep_validator, input=finding_json)",
+        "validate_cvss(platform=target_platform, report=finding)",
         "collect_evidence_bundle(finding=validated_finding)",
         "export_evidence_bundle(format=structured_dir, path=~/.opencode/data/reports/{program}/{timestamp}/)"
       ],
       "output": "validated_findings_with_evidence",
-      "state_key": "validated_data"
+      "state_key": "validated_data",
+      "gate": {
+        "field": "deep_validator_result.gate",
+        "pass_value": "PASS",
+        "confidence_threshold": 0.65,
+        "kill_action": "log_to(~/.opencode/data/reports/{program}/{timestamp}/killed/{finding_id}.json)",
+        "kill_audit": "append_to(~/.opencode/data/reports/{program}/{timestamp}/audit.jsonl)"
+      }
     },
     {
       "step": 18,
       "name": "report_generation",
-      "description": "Generate a structured draft report with confidence scores, evidence references, and suggested additional validation steps. NEVER auto-submit. Save as DRAFT only.",
+      "description": "HARD GATE: Only findings with gate=PASS AND confidence >= 0.65 proceed. Generate structured draft report with confidence scores, evidence references, and suggested additional validation steps. NEVER auto-submit. Save as DRAFT only.",
       "tool": "internal",
       "calls": [
-        "compile_report(findings=validated_findings, include_confidence=true, include_evidence_refs=true)",
+        "filter_findings(findings=validated_findings, gate=PASS, min_confidence=0.65)",
+        "compile_report(findings=passed_findings, include_confidence=true, include_evidence_refs=true)",
         "export_report(format=markdown, path=~/.opencode/data/reports/{program}/{timestamp}/DRAFT.md)",
         "export_report(format=json, path=~/.opencode/data/reports/{program}/{timestamp}/finding.json)",
-        "generate_validation_suggestions(finding=each_finding)"
+        "generate_validation_suggestions(finding=each_passed_finding)"
       ],
       "output": "final_report_draft",
       "state_key": "report"

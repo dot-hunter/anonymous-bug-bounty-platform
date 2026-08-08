@@ -1,9 +1,9 @@
 # 🐛 Anonymous Bug Bounty Platform 2026
 
-**Autonomous AI-powered bug bounty hunting platform with 194 MCP tools, multi-agent architecture, full OWASP coverage, and advanced research capabilities.**
+**Autonomous AI-powered bug bounty hunting platform with 221 MCP tools, multi-agent architecture, full OWASP coverage, and advanced research capabilities.**
 
 ![Platform](https://img.shields.io/badge/Platform-OpenCode-blue)
-![MCP Tools](https://img.shields.io/badge/MCP%20Tools-194-green)
+![MCP Tools](https://img.shields.io/badge/MCP%20Tools-221-green)
 ![OWASP](https://img.shields.io/badge/OWASP%202021%2B2025%20%2B%20LLM%202026-covered)
 ![Agents](https://img.shields.io/badge/Agents-21-orange)
 ![Code](https://img.shields.io/badge/Lines-150K%2B-brightgreen)
@@ -33,7 +33,7 @@ opencode
 
 | Component | Count | Description |
 |-----------|-------|-------------|
-| **MCP Tools** | 194 | Across 9 servers |
+| **MCP Tools** | 221 | Across 9 servers |
 | **MCP Servers** | 9 | Specialized security tools |
 | **Agents** | 21 | Multi-role autonomous agents |
 | **Commands** | 27 | Slash commands |
@@ -75,7 +75,7 @@ opencode
 
 ## 🔧 MCP Servers
 
-### vulnera-mcp (128 tools)
+### vulnera-mcp (155 tools)
 Full vulnerability assessment engine:
 - **OWASP Top 10 (2021+2025)**: Complete coverage
 - **SSRF Advanced**: DNS rebinding, IP encoding, redirect chains, gopher
@@ -85,6 +85,15 @@ Full vulnerability assessment engine:
 - **Business Logic**: Payment bypass, coupon abuse, workflow manipulation
 - **Supply Chain**: CI/CD analysis, dependency confusion, typosquatting
 - **Deserialization**: Java/Python/PHP/.NET gadget chains
+- **HTTP Smuggling**: CL.TE, TE.CL, H2.CL
+- **Advanced JWT**: KID injection, JKU, algorithm confusion
+- **GraphQL Advanced**: Batching, depth, introspection attacks
+- **WebSocket Deep**: CSWSH, message injection
+- **Prototype Pollution**: Server-side + exploitation chains
+- **gf Patterns**: URL filtering for idor/ssrf/xss/sqli/lfi/rce
+- **LinkFinder**: JS endpoint + secret extraction
+- **VHost Enum**: Host header fuzzing + poisoning checks
+- **Auth Recon**: Session-based authenticated testing, BOLA/BFLA primer
 - **Platform Core**: Planner, memory, knowledge graph, hypothesis engine
 
 ### security-research (11 tools)
@@ -269,7 +278,7 @@ Full vulnerability assessment engine:
 ```
 anonymous-bug-bounty-platform/
 ├── mcp-servers/                  # Core MCP servers
-│   ├── vulnera-mcp/             # 128 tools — main engine
+│   ├── vulnera-mcp/             # 155 tools — main engine
 │   ├── security-research/       # 11 tools — SAST/CodeQL
 │   ├── agent-reach/             # 8 tools — OSINT
 │   ├── bounty-directory/        # 6 tools — program DB

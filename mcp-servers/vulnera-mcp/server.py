@@ -4170,6 +4170,54 @@ try:
 except Exception:
     _gql_loaded = False
 
+_ws_spec = _ilu.spec_from_file_location("websocket_deep", str(Path(__file__).resolve().parent / "websocket_deep.py"))
+_mod_ws = _ilu.module_from_spec(_ws_spec)
+try:
+    _ws_spec.loader.exec_module(_mod_ws)
+    _ws_loaded = True
+except Exception:
+    _ws_loaded = False
+
+_pp_spec = _ilu.spec_from_file_location("prototype_pollution", str(Path(__file__).resolve().parent / "prototype_pollution.py"))
+_mod_pp = _ilu.module_from_spec(_pp_spec)
+try:
+    _pp_spec.loader.exec_module(_mod_pp)
+    _pp_loaded = True
+except Exception:
+    _pp_loaded = False
+
+_gf_spec = _ilu.spec_from_file_location("gf_patterns", str(Path(__file__).resolve().parent / "gf_patterns.py"))
+_mod_gf = _ilu.module_from_spec(_gf_spec)
+try:
+    _gf_spec.loader.exec_module(_mod_gf)
+    _gf_loaded = True
+except Exception:
+    _gf_loaded = False
+
+_lf_spec = _ilu.spec_from_file_location("linkfinder", str(Path(__file__).resolve().parent / "linkfinder.py"))
+_mod_lf = _ilu.module_from_spec(_lf_spec)
+try:
+    _lf_spec.loader.exec_module(_mod_lf)
+    _lf_loaded = True
+except Exception:
+    _lf_loaded = False
+
+_vh_spec = _ilu.spec_from_file_location("vhost_enum", str(Path(__file__).resolve().parent / "vhost_enum.py"))
+_mod_vh = _ilu.module_from_spec(_vh_spec)
+try:
+    _vh_spec.loader.exec_module(_mod_vh)
+    _vh_loaded = True
+except Exception:
+    _vh_loaded = False
+
+_ar_spec = _ilu.spec_from_file_location("auth_recon", str(Path(__file__).resolve().parent / "auth_recon.py"))
+_mod_ar = _ilu.module_from_spec(_ar_spec)
+try:
+    _ar_spec.loader.exec_module(_mod_ar)
+    _ar_loaded = True
+except Exception:
+    _ar_loaded = False
+
 
 @server.tool()
 def test_http_smuggling(target: str, url: str) -> dict:
@@ -4217,6 +4265,110 @@ def test_graphql_advanced(target: str, endpoint: str) -> dict:
     if not _gql_loaded:
         return {"error": "graphql_advanced module not loaded"}
     return _mod_gql.test_graphql_advanced(target, endpoint)
+
+
+@server.tool()
+def test_websocket_deep(target: str, url: str) -> dict:
+    """Deep WebSocket security testing (CSWSH, message injection, insecure endpoints)."""
+    if not _ws_loaded:
+        return {"error": "websocket_deep module not loaded"}
+    return _mod_ws.test_websocket(target, url)
+
+
+@server.tool()
+def test_ws_message_injection(target: str, url: str) -> dict:
+    """Test WebSocket message injection and command execution over WS."""
+    if not _ws_loaded:
+        return {"error": "websocket_deep module not loaded"}
+    return _mod_ws.test_ws_message_injection(target, url)
+
+
+@server.tool()
+def test_prototype_pollution(target: str, url: str) -> dict:
+    """Test server-side prototype pollution via JSON body and query params."""
+    if not _pp_loaded:
+        return {"error": "prototype_pollution module not loaded"}
+    return _mod_pp.test_prototype_pollution(target, url)
+
+
+@server.tool()
+def test_pp_chain(target: str, url: str) -> dict:
+    """Prototype pollution exploitation chain guidance (PP->RCE, PP->auth bypass, PP->XSS)."""
+    if not _pp_loaded:
+        return {"error": "prototype_pollution module not loaded"}
+    return _mod_pp.test_pp_chain(target, url)
+
+
+@server.tool()
+def filter_urls_gf(urls: list, pattern_type: str = "idor") -> dict:
+    """Filter URLs by gf-style patterns (idor, ssrf, xss, sqli, redirect, lfi, rce, ssti, debug)."""
+    if not _gf_loaded:
+        return {"error": "gf_patterns module not loaded"}
+    return _mod_gf.filter_urls_gf(urls, pattern_type)
+
+
+@server.tool()
+def run_gf_patterns(urls: list, pattern_types: list = None) -> dict:
+    """Run all gf pattern categories over a URL list (uses gf CLI if installed)."""
+    if not _gf_loaded:
+        return {"error": "gf_patterns module not loaded"}
+    return _mod_gf.run_gf_patterns(urls, pattern_types)
+
+
+@server.tool()
+def extract_interesting_params(urls: list) -> dict:
+    """Extract and rank interesting parameters from URLs for targeted testing."""
+    if not _gf_loaded:
+        return {"error": "gf_patterns module not loaded"}
+    return _mod_gf.extract_interesting_params(urls)
+
+
+@server.tool()
+def linkfinder_extract(js_url: str) -> dict:
+    """LinkFinder-style JS endpoint + secret extraction from a single JS file."""
+    if not _lf_loaded:
+        return {"error": "linkfinder module not loaded"}
+    return _mod_lf.extract_from_js(js_url)
+
+
+@server.tool()
+def linkfinder_crawl(base_url: str, js_hints: list = None) -> dict:
+    """Crawl a page for JS files and extract endpoints + secrets from each."""
+    if not _lf_loaded:
+        return {"error": "linkfinder module not loaded"}
+    return _mod_lf.crawl_js_urls(base_url, js_hints)
+
+
+@server.tool()
+def enumerate_vhosts(target: str, wordlist: list = None) -> dict:
+    """Enumerate virtual hosts via Host header fuzzing (ffuf/gobuster/builtin)."""
+    if not _vh_loaded:
+        return {"error": "vhost_enum module not loaded"}
+    return _mod_vh.enumerate_vhosts(target, wordlist)
+
+
+@server.tool()
+def check_vhost_bypass(target: str, url: str) -> dict:
+    """Check host-header injection: password reset poisoning, cache poisoning, SSRF via Host."""
+    if not _vh_loaded:
+        return {"error": "vhost_enum module not loaded"}
+    return _mod_vh.check_vhost_bypass(target, url)
+
+
+@server.tool()
+def session_recon(target: str, session_file: str, urls: list = None) -> dict:
+    """Authenticated recon: probe URLs with session cookies/headers to find auth-gated endpoints."""
+    if not _ar_loaded:
+        return {"error": "auth_recon module not loaded"}
+    return _mod_ar.session_recon(target, session_file, urls)
+
+
+@server.tool()
+def auth_bola_primer(target: str, session_file: str, base_urls: list = None) -> dict:
+    """Generate BOLA/BFLA test plan for authenticated endpoints from a session file."""
+    if not _ar_loaded:
+        return {"error": "auth_recon module not loaded"}
+    return _mod_ar.auth_bola_primer(target, session_file, base_urls)
 
 
 if __name__ == "__main__":
