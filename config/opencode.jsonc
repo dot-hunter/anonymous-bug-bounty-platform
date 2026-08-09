@@ -250,6 +250,22 @@
         "external_directory": "deny"
       }
     },
+    // WordPress Bug Bounty Hunter — one-select full pipeline:
+    // discover online -> save -> analyze -> find WP -> hunt (xss2shell+toolbox)
+    // -> deep audit -> todo list -> upgrade. Scope-gated, never auto-submits.
+    "wp-hunter": {
+      "file": "/home/bb/.config/opencode/agents/wp-hunter.md",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "task": "deny",
+        "external_directory": "deny"
+      }
+    },
     // Chain builder — exploit chain construction
     "chain-builder": {
       "file": "/home/bb/.config/opencode/agents/chain-builder.md",
