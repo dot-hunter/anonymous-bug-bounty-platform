@@ -32,20 +32,44 @@ fi
 mkdir -p "$OUT_DIR"
 echo "[*] recon_engine.sh → $OUT_DIR (target: $TARGET)"
 
-# --- Stage 1: subdomain enumeration ---
+# --- Stage 1: subdomain enumeration (parallel, incremental output) ---
 echo "[*] Stage 1: subdomain enumeration"
 {
-  if command -v subfinder >/dev/null 2>&1; then subfinder -d "$TARGET" -silent 2>/dev/null; fi
-  if command -v assetfinder >/dev/null 2>&1; then assetfinder --subs-only "$TARGET" 2>/dev/null; fi
-  if command -v amass >/dev/null 2>&1; then amass enum -passive -d "$TARGET" -silent 2>/dev/null; fi
-  # crt.sh passive
-  curl -s -m 30 "https://crt.sh/?q=%25.${TARGET}&output=json" 2>/dev/null \
-    | python3 -c "import sys,json
+  # Parallel passive enumeration — each tool writes to a temp file
+  TMPDIR_STAGE1=$(mktemp -d)
+  (
+    if command -v subfinder >/dev/null 2>&1; then
+      timeout 90 subfinder -d "$TARGET" -silent 2>/dev/null > "$TMPDIR_STAGE1/subfinder.txt" || true
+    fi
+  ) &
+  (
+    if command -v assetfinder >/dev/null 2>&1; then
+      timeout 90 assetfinder --subs-only "$TARGET" 2>/dev/null > "$TMPDIR_STAGE1/assetfinder.txt" || true
+    fi
+  ) &
+  (
+    if command -v amass >/dev/null 2>&1 && [ "$MODE" != "--quick" ]; then
+      timeout 180 amass enum -passive -d "$TARGET" -silent 2>/dev/null > "$TMPDIR_STAGE1/amass.txt" || true
+    fi
+  ) &
+  (
+    # crt.sh passive with retry + jq-less parse
+    for i in 1 2 3; do
+      curl -s -m 25 "https://crt.sh/?q=%25.${TARGET}&output=json" 2>/dev/null > "$TMPDIR_STAGE1/crt.json"
+      [ -s "$TMPDIR_STAGE1/crt.json" ] && ! grep -q "502\|error" "$TMPDIR_STAGE1/crt.json" && break
+      sleep 3
+    done
+    python3 -c "import sys,json
 try:
-  for r in json.load(sys.stdin):
+  for r in json.load(open('$TMPDIR_STAGE1/crt.json')):
     for n in r.get('name_value','').split('\n'):
       print(n.strip())
-except Exception: pass" 2>/dev/null
+except Exception: pass" 2>/dev/null > "$TMPDIR_STAGE1/crt.txt" || true
+  ) &
+  wait
+
+  cat "$TMPDIR_STAGE1"/*.txt 2>/dev/null
+  rm -rf "$TMPDIR_STAGE1"
   echo "$TARGET"   # include the apex domain
 } | sed 's/\*\.//' | tr 'A-Z' 'a-z' | sort -u > "$OUT_DIR/subs.txt"
 echo "[+] subs.txt: $(wc -l < "$OUT_DIR/subs.txt") unique subdomains"
@@ -60,11 +84,11 @@ else
 fi
 echo "[+] resolved.txt: $(wc -l < "$OUT_DIR/resolved.txt") live-resolvable"
 
-# --- Stage 3: HTTP probing ---
+# --- Stage 3: HTTP probing + fingerprint (parallel with URL harvesting) ---
 echo "[*] Stage 3: HTTP probing + fingerprint"
 if command -v httpx >/dev/null 2>&1; then
-  httpx -l "$OUT_DIR/resolved.txt" -silent -title -tech-detect -status-code \
-    -follow-redirects -timeout 8 -threads 20 2>/dev/null > "$OUT_DIR/live.txt"
+  timeout 120 httpx -l "$OUT_DIR/resolved.txt" -silent -title -tech-detect -status-code \
+    -follow-redirects -timeout 8 -threads 30 2>/dev/null > "$OUT_DIR/live.txt" || true
 else
   # curl fallback
   : > "$OUT_DIR/live.txt"
@@ -75,15 +99,24 @@ else
 fi
 echo "[+] live.txt: $(wc -l < "$OUT_DIR/live.txt") live hosts"
 
-# --- Stage 4: URL harvesting ---
+# --- Stage 4: URL harvesting (parallel with probe) ---
 echo "[*] Stage 4: URL harvesting"
-{
-  if command -v gau >/dev/null 2>&1; then gau --subs "$TARGET" 2>/dev/null; fi
-  if command -v waybackurls >/dev/null 2>&1; then waybackurls "$TARGET" 2>/dev/null; fi
+TMPURL=$(mktemp)
+(
+  if command -v gau >/dev/null 2>&1; then timeout 90 gau --subs "$TARGET" 2>/dev/null || true; fi
+) > "$TMPURL.gau" &
+(
+  if command -v waybackurls >/dev/null 2>&1; then timeout 60 waybackurls "$TARGET" 2>/dev/null || true; fi
+) > "$TMPURL.wb" &
+(
   if [ "$MODE" != "--quick" ] && command -v katana >/dev/null 2>&1; then
-    katana -u "https://$TARGET" -silent -d 2 2>/dev/null
+    timeout 60 katana -u "https://$TARGET" -silent -d 2 2>/dev/null || true
   fi
-} | sort -u > "$OUT_DIR/urls.txt"
+) > "$TMPURL.kat" &
+wait
+cat "$TMPURL".gau "$TMPURL".wb "$TMPURL".kat 2>/dev/null | sort -u > "$OUT_DIR/urls.txt"
+rm -f "$TMPURL"*
+[ -s "$OUT_DIR/urls.txt" ] || echo "[!] URL harvest empty — check gau/waybackurls connectivity"
 echo "[+] urls.txt: $(wc -l < "$OUT_DIR/urls.txt") historical/live URLs"
 
 # --- Stage 5: interesting parameter filter ---

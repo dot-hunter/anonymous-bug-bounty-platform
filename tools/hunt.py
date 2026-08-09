@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -89,7 +89,7 @@ def run_scanner(target: str, quick: bool) -> dict:
 
     summary = {
         "target": target,
-        "ts": datetime.now(datetime.UTC).isoformat(),
+        "ts": datetime.now(timezone.utc).isoformat(),
         "mode": "quick" if quick else "full",
         "exit_code": result.returncode,
         "elapsed_s": round(elapsed, 1),

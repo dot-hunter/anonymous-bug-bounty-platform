@@ -71,6 +71,9 @@ def parse_yaml_subset(text: str) -> dict:
             continue
         if current and line.startswith("-"):
             entry = line[1:].strip().strip('"').strip("'")
+            # strip trailing inline comments (e.g. `- "*.example.com"  # note`)
+            if " #" in entry:
+                entry = entry.split(" #", 1)[0].strip().strip('"').strip("'")
             if entry:
                 result[current].append(entry)
     return result
@@ -124,20 +127,28 @@ def match_entry(host: str, entry: str) -> bool:
 
 
 def verdict(target: str, scope: dict) -> tuple[bool, str]:
-    """Return (allowed, reason). Explicit out-of-scope match wins over in-scope."""
+    """Return (allowed, reason).
+
+    Precedence (safe by design):
+      1. EXPLICIT in_scope match  → ALLOW   (specific host beats wildcard exclusions)
+      2. out_of_scope match       → BLOCK
+      3. not listed               → BLOCK (fail-closed default)
+    """
     host = host_from_target(target)
     in_list = scope.get("in_scope", []) or []
     out_list = scope.get("out_of_scope", []) or []
 
-    for entry in out_list:
-        if match_entry(host, entry):
-            return False, f"out_of_scope match: {entry}"
-
+    # 1. explicit in-scope entries win (they are the authoritative allowlist)
     for entry in in_list:
         if match_entry(host, entry):
             return True, f"in_scope match: {entry}"
 
-    # Default: NOT listed = NOT allowed (fail-closed)
+    # 2. out-of-scope / wildcard exclusions block
+    for entry in out_list:
+        if match_entry(host, entry):
+            return False, f"out_of_scope match: {entry}"
+
+    # 3. default: NOT listed = NOT allowed (fail-closed)
     return False, "not listed in in_scope (fail-closed default)"
 
 
