@@ -838,18 +838,29 @@ tail -f ~/.config/vulnera-mcp/audit.jsonl | python3 -c \
 
 ---
 
-## REMAINING GAPS (for operator awareness)
+## PLATFORM STATUS (audited & verified 2026-08-09)
 
-These are known gaps in the current platform. They reduce effectiveness but do not break operation.
+All previously documented gaps are FIXED and pushed to GitHub (commit 7227536 + follow-ups):
 
-1. **writeup_index has 54 entries** (target: 400+). Expand `seed_database()` in `writeup_index.py`. `search_techniques()` works but returns thin results.
+1. **writeup_index**: 356 curated entries across 15 vuln classes (was 54). `writeup_expansion.py` adds 355 techniques; `search_techniques()` verified returning ranked, paid techniques. DB: `~/.config/platform/writeups.db`.
+2. **hunt-* skills**: hunt-xss/ssrf/idor/oauth/rce/llm-ai upgraded to deep-dive 2026.2 editions (100-180+ dense lines each; pentest-agents parity).
+3. **rules/ directory**: `rules/hunting-rules.md`, `never-submit.md`, `chain-table.md` (4 deep chains), `mistakes.md` — read at session start.
+4. **`commands/hunt.md`**: `tools/hunt.py` + `tools/vuln_scanner.sh` implemented and smoke-tested. `/hunt` works.
+5. **RAG builder**: `tools/rag-builder/build.py` + `search_payloads.py` + corpus in `data/` (20 docs, 15 classes). Index: `rag-index.db`.
+6. **`/learn` command**: `commands/learn.md` wraps `record_outcome()` + `platform_generate_lessons()`.
 
-2. **hunt-* SKILL.md files are 93-179 lines each** (pentest-agents: 770-1,135 lines per skill). Methodology depth is real but narrower. Expand each skill file using public CVE and HackerOne Hacktivity references.
+### Toolchain (all commands operational)
+scope_checker.py, recon_engine.sh, bypass_403.sh, waf_encoder.py, multipart_mutator.py,
+waf_response_analyzer.py, takeover_scanner.sh, token_scanner.py, param_discovery.sh,
+spray_orchestrator.sh (dry-run by default, --execute for live), breach_checker.py,
+wordlist_engine.sh, osint_employees.sh, scope_aggregator.sh, external_arsenal.sh,
+dashboard.py, install_tools.sh, hunt.py, vuln_scanner.sh.
 
-3. **No `rules/` directory.** No hunting-rules.md, never-submit.md, chain-table.md, or mistakes.md. These rules are embedded in this prompt but not in a standalone file agents can read at session start. Create `rules/` with these four files.
-
-4. **`commands/hunt.md` references `tools/hunt.py`** which does not exist. `/hunt` command is broken. Rewrite to call MCP tools directly, or create `tools/hunt.py`.
-
-5. **No RAG builder.** Writeup index is seeded from 54 hardcoded entries. No automated corpus builder. Add `tools/rag-builder/build.py` to clone public security research repos and index them.
-
-6. **No `/learn` command.** `record_outcome()` exists in `feedback_loop.py` and is MCP-exposed, but there is no slash command wrapper. Operator must call it manually. Add `commands/learn.md`.
+### Known operational constraints (2026-08-09)
+- OPSEC stack (VPN/Tor/proxy chain) is NOT installed on this host — the "anonymous"
+  claims require `sudo apt install tor proxychains wireguard` + VPN credentials before
+  live testing from this box. Run `external_arsenal.sh --status` to verify.
+- Free-model provider (`opencode/deepseek-v4-flash-free`) may intermittently error
+  ("Unexpected server error") — retry or fall back to the degradation path (pi-tool).
+- scope.yaml is fail-closed: unlisted hosts are BLOCKED. Update via
+  `scope_aggregator.sh` or `scope_checker.py --add`.

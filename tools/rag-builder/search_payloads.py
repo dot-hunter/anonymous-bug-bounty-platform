@@ -28,8 +28,7 @@ def search(db_path: Path, vuln_class: str | None, query: str, top: int) -> list[
     params: list = []
     where = ""
     if vuln_class:
-        where = "WHERE d.vuln_class = ?"
-        params.append(vuln_class.lower())
+        where = " WHERE d.vuln_class = ?"
 
     # Term frequency overlap scoring
     terms = {t for t in query.lower().split() if len(t) > 2}
@@ -41,15 +40,20 @@ def search(db_path: Path, vuln_class: str | None, query: str, top: int) -> list[
             join += f" JOIN keywords {alias} ON {alias}.doc_id = d.id AND {alias}.term = ?"
             params.append(t)
             score_expr = f"({score_expr} + 1)"
+        # WHERE placeholder comes after JOIN placeholders in SQL text → append class param last
+        if vuln_class:
+            params.append(vuln_class.lower())
         sql = (
             f"SELECT d.title, d.url, d.vuln_class, {score_expr} AS hits "
-            f"FROM documents d {join} WHERE 1=1 {where} "
+            f"FROM documents d {join} {where} "
             f"ORDER BY hits DESC LIMIT ?"
         )
     else:
+        if vuln_class:
+            params.append(vuln_class.lower())
         sql = (
             f"SELECT d.title, d.url, d.vuln_class, 1 AS hits "
-            f"FROM documents d WHERE 1=1 {where} "
+            f"FROM documents d {where} "
             f"ORDER BY d.id LIMIT ?"
         )
     params.append(top)

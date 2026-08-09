@@ -74,7 +74,17 @@ def load_corpora(root: Path) -> list[dict]:
     return docs
 
 
+KNOWN_CLASSES = ["xss", "ssrf", "sqli", "ssti", "idor", "bfla", "rce", "xxe",
+                 "oauth", "race", "lfi", "jwt", "file_upload", "graphql",
+                 "llm", "nosqli", "prototype_pollution"]
+
+
 def infer_vuln_class(content: str, title: str) -> str:
+    # 1. filename is the strongest signal (corpus files are named by class)
+    for cls in KNOWN_CLASSES:
+        if cls in title.lower():
+            return cls
+    # 2. content fallback
     hay = (content[:2000] + " " + title).lower()
     table = [
         ("xss", ["xss", "cross-site script", "dompurify", "mutation xss", "dangling markup"]),
@@ -84,8 +94,8 @@ def infer_vuln_class(content: str, title: str) -> str:
         ("idor", ["idor", "bola", "object-level authorization", "direct object reference"]),
         ("bfla", ["bfla", "broken function level", "method-level auth"]),
         ("rce", ["rce", "remote code execution", "command injection", "deserialization"]),
-        ("xpath-no", ["xxe", "xml external entity", "doctype entity"]),
-        ("xss-oauth", ["oauth", "open redirect", "redirect_uri", "csrf oauth"]),
+        ("xxe", ["xxe", "xml external entity", "doctype entity"]),
+        ("oauth", ["oauth", "open redirect", "redirect_uri", "csrf oauth"]),
         ("race", ["race condition", "toctou", "double-spend", "single-use"]),
     ]
     for cls, needles in table:
