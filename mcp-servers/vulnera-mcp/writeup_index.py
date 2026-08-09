@@ -8,6 +8,11 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 
+try:
+    from writeup_expansion import EXPANDED_SEED_DATA
+except Exception:  # pragma: no cover - standalone fallback
+    EXPANDED_SEED_DATA = []
+
 logger = logging.getLogger("writeup-index")
 
 DATA_DIR = Path.home() / ".config" / "platform"
@@ -182,7 +187,8 @@ def seed_database():
 
     now = datetime.utcnow().isoformat()
     inserted = 0
-    for item in seed_data:
+    # Baseline curated corpus + expanded corpus (writeup_expansion.py)
+    for item in seed_data + EXPANDED_SEED_DATA:
         # Insert only records that do not already exist (keyed by vuln_class + technique)
         exists = conn.execute(
             "SELECT 1 FROM writeups WHERE vuln_class = ? AND technique = ? LIMIT 1",

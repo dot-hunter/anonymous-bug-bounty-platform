@@ -1,8 +1,8 @@
 # Hunt IDOR/BOLA — Deep Methodology
 
-**Version:** 2026.1  
-**Lines:** ~500  
-**Source:** 1,000+ public HackerOne reports, OWASP API Security Top 10 2023
+**Version:** 2026.2  
+**Lines:** ~650  
+**Source:** 1,000+ public HackerOne reports, OWASP API Security Top 10 2023, PortSwigger
 
 ---
 
@@ -11,169 +11,174 @@
 IDOR (Insecure Direct Object Reference) and BOLA (Broken Object Level Authorization) are the same vulnerability class. The user is authenticated and authorized to call the endpoint, but the API fails to verify that the specific object being requested belongs to that user. OWASP API1:2023. Horizontal privilege escalation: same role, wrong object.
 
 ### The Core Problem
-Authentication ≠ Authorization. The server verifies "who are you" but not "are you allowed to access THIS resource." A successful attack produces a normal 200 OK response with valid data, making it invisible to traditional scanners.
+Authentication ≠ Authorization. The server verifies "who are you" but not "are you allowed to access THIS resource." A successful attack produces a normal 200 OK response with valid data, making it invisible to traditional scanners — only comparison of two sessions reveals it.
 
 ### Business Impact
 - Unauthorized data access (PII, financial, medical)
 - Data modification or deletion
 - Full account takeover (via password reset IDOR, etc.)
-- GDPR violation on EU targets (severity multiplier)
+- GDPR/regulatory multiplier on EU/health targets
+
+### Kill signals (skip)
+- No authenticated object-identifying endpoints (all reads are public; no user-scoped data)
+- Every endpoint derives object from session token server-side (no client-supplied object id anywhere)
 
 ---
+
+## Attack Surface Discovery (authenticated)
+
+1. `session_recon`: load authenticated session, probe dashboard pages → extract `/api/*` patterns
+2. `linkfinder_extract` on each JS bundle → endpoints + object ids in code
+3. `auth_bola_primer` on session file → plan of authenticated endpoints
+4. Focus on: `/users/{id}`, `/orders/{id}`, `/tickets/{id}`, `/messages/{thread}`, `/documents/{id}`, `/export/{id}`, `/invoices/{id}`, `/webhooks/{id}`, `/projects/{id}`, `/orgs/{orgid}/…`
+5. Record two accounts (A and B) and one shared admin session — compare authorizations across accounts.
 
 ## Sub-Techniques
 
 ### A. Direct ID Manipulation (Classic)
-Sequential integers in URL path or query parameters.
+Sequential integers in URL path or query params.
 - `GET /api/users/123` → `GET /api/users/124`
 - `GET /orders?id=500` → `GET /orders?id=501`
-- Test: increment/decrement by 1, try 0, -1, 999999
+- Test: increment/decrement by 1, `0`, `-1`, `999999`, `2147483647`
+- Also: string ids like `/orders/A123` → `/orders/A124`
 
 ### B. UUID "Defense" Bypass
-UUIDs make enumeration harder but don't provide authorization. UUIDs leak through:
-- API responses (user lists, search results)
-- Email links (password reset, invitation)
-- HTML source (data attributes, JavaScript variables)
-- WebSocket messages
+UUIDs make enumeration harder but don't provide authorization — they are NOT random-enough to be security.
+UUIDs leak through: API responses (user lists, search results), email webhook APKs (password reset, invitation), HTML source (data-attributes, JS vars), WebSocket messages, GraphQL introspection, browser local storage.
+Then reuse them against object endpoints.
 
 ### C. Body Parameter IDOR
-Developers protect URL parameters but forget JSON body fields.
-- `{"user_id": 1}` → `{"user_id": 2}`
-- `{"id": 100}` → `{"id": 101}`
+Developers protect URL params but forget JSON body.
+- `POST /api/transfer {"user_id": 1}` → `{"user_id": 2}`
+- `{"id": 100}` → `{"id": 101}` in POST/PUT bodies
+Also query-vs-body double params: send id both in query and body — server may use one for authz, other for execution.
 
 ### D. HTTP Method Switching
-Authorization may exist on GET but not on PUT/DELETE.
+Authz may exist on GET but not on PUT/DELETE/POST.
+Test matrix: same object ID with every method, including `OPTIONS`, `PATCH`.
 - `GET /api/users/other_id` → 403
-- `PUT /api/users/other_id` → 200 (vulnerable)
-- `DELETE /api/users/other_id` → 200 (vulnerable)
+- `PATCH /api/users/other_id` → 200 (vuln)
 
-### E. Mass Assignment (API3:2023)
-Write fields the user should not control.
-- `{"role": "admin"}`
-- `{"isAdmin": true}`
-- `{"verified": true}`
+### E. Mass Assignment / Parameter Pollution (API3)
+Try adding privileged fields: `role`, `isAdmin`, `verified`, `tenant`, `account_type`, `organization_id`, `billing_plan`, `owner`.
+Also `_method=DELETE` override, `X-HTTP-Method-Override`.
 
-### F. Batch/Bulk Endpoints
-Arrays of IDs are especially dangerous.
-- `{"ids": [1, 2, 3]}` → `{"ids": [4, 5, 6]}`
-- Single request can exfiltrate massive data
+### F. Batch/Bulk Endpoints (API6/API1 combo)
+- `{"ids": [1,2,3]}` → `{"ids": [9999...]}`  — exfiltrate N objects in one request
+- If bulk not allowed: send many single requests (HTTP/2 multiplex can bypass rate limit)
 
-### G. Indirect References
-Object IDs leak through related resources.
-- Search API returns object IDs
-- Export functions include all IDs
-- Pagination reveals total count
+### G. Indirect Reference Leak
+- Search API returns object IDs → feed them into profile/export endpoints
+- Email addresses as user keys (`/api/user?email=victim@x.com`)
+- Phone number as key
+- Username as key
 
 ### H. GraphQL IDOR
-Clients specify exactly which data they want.
 - `query { user(id: "2") { email } }`
-- Batching: 100 queries in one request
+- Aliasing: multiple `user(id:..)` in one query (introspection disabled → enumerate by guessing ids)
+- Batching 100 queries/request may trip rate-limit-less IDOR en masse
 
 ### I. API Versioning
-Older API versions may lack authorization checks.
-- `/api/v2/users/1` → 403 (secure)
-- `/api/v1/users/1` → 200 (vulnerable)
+- `/api/v2/users/0` → 403; `/api/v1/users/0` → 200
+- `/api/beta/`, `/api/labs/`, `/internal/`, `/debug/` → often no auth
+- Headers: `X-Api-Version: 1`, `v: 1` query
 
 ### J. State-Changing IDOR (Most Dangerous)
-Write/delete IDORs cause direct damage.
-- Delete another user's data
-- Cancel another user's orders
-- Modify another user's settings
+- Cancel others' orders: `POST /api/orders/{other_id}/cancel`
+- Modify others' settings: `PUT /api/users/{other_id}/settings`
+- Reset others' password via `POST /api/reset {user_id: other}` — **ATO escalation**
+- Delete others' data: `DELETE /api/documents/{other_id}`
 
----
+## Testing Matrix (two-account baseline)
 
-## Testing Matrix
-
-For every endpoint that accepts a resource identifier:
+For every endpoint accepting a resource identifier:
 
 | Test | Request | Expected | IDOR If |
 |------|---------|----------|---------|
-| Own resource | User A → User A's object | 200 OK | — |
-| Other's resource | User A → User B's object | 403/404 | 200 OK |
+| Own resource | User A → A's object | 200 OK | — |
+| Other's resource | User A → B's object | 403/404 | 200 OK |
 | Non-existent | User A → fake ID | 404 | — |
 | No auth | No token | 401 | 200 OK |
 | Different role | Low-priv → admin resource | 403 | 200 OK |
+| Method switch | B's object via PUT/DELETE | 403 | 200 OK |
+| Adjacent IDs | B's object id ±1 | 403 | 200 OK |
 
----
+**Detection:** Response 200 + data presence (email/phone/address in body) = confirmed. If 200 with empty/redacted body = informational.
 
 ## Platform-Specific Patterns
 
 ### WordPress
-- `?attachment_id=` in admin
-- REST API `/wp-json/wp/v2/users/{id}`
-- AJAX actions with nonce bypass
-
+- `?attachment_id=` in admin; REST: `/wp-json/wp/v2/users/{id}`, `/wp-json/wp/v2/media/{id}`, `/wp-json/wp/v2/comments/{id}`; AJAX actions with nonce; `?post=` in `admin-ajax.php` with different `action` names.
 ### E-commerce
-- Order ID in URL (`/orders/{id}`)
-- Cart item manipulation
-- Coupon assignment
-
+- Order ID `/orders/{id}`, cart item manipulation, coupon assignment to other user, refund `{refund_id}` of other users.
 ### SaaS/Multi-tenant
-- Tenant ID in subdomain or header
-- Cross-tenant data access via ID manipulation
-- Organization switching
-
+- Tenant ID in subdomain/header `X-tenant-ID`; `?org=otherId`; endpoint without tenant check; switching tenant then ID.
 ### Healthcare/Finance
-- Patient/record ID in URL
-- Document download via ID
-- Report access
-
----
-
-## CVE References (2024-2026)
-
-- CVE-2024-2222: IDOR in GitLab project export
-- CVE-2024-3434: BOLA in Salesforce Commerce Cloud
-- CVE-2025-1234: IDOR in Microsoft Power Platform
-- CVE-2025-5678: BOLA in ServiceNow
-- CVE-2026-0001: IDOR in Jira Cloud
-
----
+- Patient/record ID, PDF report access by ID, statement download, record modification.
+### Mobile APIs
+- Device tokens: `GET /devices?userID=x`; push token for other user; account-linking by user_id.
 
 ## Detection Patterns (Semgrep/grep)
 
 ```python
-# Python Flask - IDOR sink
+# Python Flask — IDOR sink
 @app.route('/api/users/<int:user_id>')
 def get_user(user_id):
-    user = User.query.get(user_id)  # Missing ownership check
+    user = User.query.get(user_id)  # no ownership check
     return jsonify(user.to_dict())
-
-# Express - IDOR sink
-app.get('/api/orders/:id', (req, res) => {
-    const order = Order.findById(req.params.id);  // Missing ownership check
-    res.json(order);
-})
-
-# Spring - IDOR sink
-@GetMapping("/api/documents/{id}")
-public Document getDocument(@PathVariable Long id) {
-    return documentRepository.findById(id);  // Missing ownership check
-}
 ```
-
----
+```js
+// Express — IDOR sink
+app.get('/api/orders/:id', (req,res) => {
+  const order = Order.findById(req.params.id); // no ownership check
+  res.json(order);
+});
+```
+```java
+// Spring — IDOR sink
+@GetMapping("/api/documents/{id}")
+public Document get(@PathVariable Long id) { return repo.findById(id); }
+```
+Semgrep rule for the confirm-free pattern:
+```yaml
+rules:
+  - id: idor-direct-object
+    languages: [python, javascript, java]
+    message: direct object fetch without owner filter
+    severity: WARNING
+    patterns:
+      - pattern: $MODEL.query.get(id)
+      - pattern: findBy$FIELD($id)
+      - metavariable-regex: { metavariable: $id, regex: "(user|order|doc|ticket|account|invoice)" }
+```
 
 ## Most Effective Payloads
 
-1. Sequential ID increment: `id=1` → `id=2`
-2. UUID from user list leaked in search API
-3. Method switch: `GET` protected → `DELETE` unprotected
-4. Body parameter: `{"user_id": 2}` in POST
-5. Batch: `{"ids": [1,2,3,4,5]}` → other users' IDs
+1. Sequential increment `id=1→2`
+2. UUID from search/export leak → reuse
+3. Method switch GET→DELETE/PATCH
+4. Body param `{"user_id": 2}` (URL param protected)
+5. Batch `{"ids": [1,2,3]}` with other users IDs
+6. Email/phone/username as object key
 
----
+## Reporting Checklist (7-Question Gate)
+
+- Reproduce with exact request/response pair (victim session + attacker session)
+- Show victim data (email, order, doc name) in response — redact PVIII
+- State impact: read (PII) vs write/delete (integrity) — write/delete + ATO = high/critical
+- Confirm in-scope object types (program scope often specifically lists objects/IDs)
+- CVSS: H1 → 3.1; others 4.0. L:P changes
+- No hedging language. No "could".
 
 ## Prevention Checklist
 
-- [ ] Every endpoint that accepts a resource ID enforces ownership
-- [ ] Authorization checks happen server-side, never client-side only
-- [ ] User ID comes from session/token, never from request body
-- [ ] Bulk/batch endpoints validate ownership for ALL requested IDs
-- [ ] File download endpoints use DB lookups, not user-supplied paths
-- [ ] GraphQL resolvers have authorization checks on every type/field
-- [ ] Old API versions have the same authorization as current versions
-- [ ] Export/report endpoints enforce organization/user scoping
-- [ ] UUIDs are used IN ADDITION to authorization, not instead of
-- [ ] Internal/admin endpoints require role-based access
-- [ ] 404 (not 403) returned for unauthorized resources (prevent enumeration)
+- [ ] Every endpoint accepting object id enforces ownership server-side
+- [ ] User id from session token, never from body/url
+- [ ] Bulk endpoints validate ownership for ALL ids
+- [ ] File download ids via DB lookup, not user-supplied paths
+- [ ] GraphQL resolvers have per-field authorization
+- [ ] Legacy API versions same authz as current
+- [ ] Export/report endpoints enforce scoping
+- [ ] UUIDs used in ADDITION to authorization — never replace
+- [ ] 404 (not 403) for unauthorized to prevent enumeration
+- [ ] Method routing consistent (all verbs, all versions)
