@@ -10,13 +10,16 @@ resolve_authorization() returns a verdict with full provenance:
     reason:  human-readable explanation
 
 Rules (in priority order):
-  1. Exact out-of-scope entry match        -> out_of_scope
-  2. Out-of-scope wildcard parent match     -> out_of_scope
-  3. Exact in-scope domain match            -> in_scope
-  4. In-scope wildcard parent match         -> in_scope
-  5. URL prefix match against in-scope URL  -> in_scope
-  6. Subdomain of in-scope domain           -> in_scope
-  7. Otherwise                              -> unknown (not covered)
+  1. Explicit (non-wildcard) out-of-scope entry  -> out_of_scope
+     (deliberate per-host/path exclusions always win)
+  2. Exact in-scope domain match                 -> in_scope
+     (authoritative allowlist: beats wildcard OOS catch-alls)
+  3. URL prefix match against in-scope URL       -> in_scope
+  4. Out-of-scope wildcard parent match          -> out_of_scope
+     (catch-all "everything else" exclusions + carve-outs)
+  5. In-scope wildcard parent match              -> in_scope
+  6. Subdomain of in-scope domain                -> in_scope
+  7. Otherwise                                   -> unknown (not covered)
 
 The resolver is pure: it makes no network requests and performs no
 testing. It answers "is this target covered by this program's scope?"
@@ -59,28 +62,48 @@ class AuthorizationResolver:
         if not host:
             return cls._verdict("unknown", None, target, "Could not parse target as hostname/URL")
 
-        # 1+2. Out-of-scope checks
-        oos_hits = cls._match_scope(scope.get("out_of_scope", []), host, target)
+        # 1. EXPLICIT (non-wildcard) out-of-scope entries — deliberate
+        #    per-host/path exclusions win over everything.
+        explicit_oos = [
+            e for e in scope.get("out_of_scope", [])
+            if not e.strip().lower().startswith("*.")
+        ]
+        oos_hits = cls._match_scope(explicit_oos, host, target)
         if oos_hits:
             return cls._verdict("out_of_scope", oos_hits[0], target,
-                                f"Target matches out-of-scope entry: {oos_hits[0]}")
-        # 3. Exact domain match
+                                f"Target matches explicit out-of-scope entry: {oos_hits[0]}")
+
+        # 2. Exact in-scope domain match — the authoritative allowlist.
+        #    An explicitly listed host stays in scope even when a wildcard
+        #    out-of-scope entry (e.g. "*.dmp.gouv.fr") would also match it.
         if host in scope.get("domains", []):
             return cls._verdict("in_scope", host, target,
                                 f"Exact in-scope domain match: {host}")
 
-        # 4. Wildcard match (parent wildcard covers target)
+        # 3. URL prefix match against in-scope URL assets
+        for asset in scope.get("assets", []):
+            if cls._url_matches(asset, target):
+                return cls._verdict("in_scope", asset, target,
+                                    f"URL scope entry {asset} matches target")
+
+        # 4. Out-of-scope wildcard parents — catch-all exclusions
+        #    ("everything else under this parent") and carve-outs like
+        #    "*.dev.api.acme.com" out of "*.api.acme.com".
+        wildcard_oos = [
+            e for e in scope.get("out_of_scope", [])
+            if e.strip().lower().startswith("*.")
+        ]
+        oos_hits = cls._match_scope(wildcard_oos, host, target)
+        if oos_hits:
+            return cls._verdict("out_of_scope", oos_hits[0], target,
+                                f"Target matches out-of-scope wildcard: {oos_hits[0]}")
+
+        # 5. In-scope wildcard parent covers target
         for wc in scope.get("wildcards", []):
             wc_host = cls._strip_wildcard(wc)
             if cls._is_subdomain_of(host, wc_host):
                 return cls._verdict("in_scope", wc, target,
                                     f"In-scope wildcard {wc} covers {host}")
-
-        # 5. URL prefix match against in-scope URL assets
-        for asset in scope.get("assets", []):
-            if cls._url_matches(asset, target):
-                return cls._verdict("in_scope", asset, target,
-                                    f"URL scope entry {asset} matches target")
 
         # 6. Subdomain of an in-scope domain (domains imply subdomains)
         for dom in scope.get("domains", []):

@@ -104,3 +104,86 @@ class TestAuthorizationResolver:
     def test_requires_target(self, sample_program):
         verdict = AuthorizationResolver.resolve_authorization(sample_program, "")
         assert verdict["verdict"] == "unknown"
+
+
+class TestAuthorizationResolverPrecedence:
+    """Regression: explicit in-scope entries must beat wildcard out-of-scope
+    catch-alls, while unlisted children and carve-outs stay excluded."""
+
+    @pytest.fixture
+    def dmp_like_program(self):
+        return {
+            "handle": "dmp",
+            "name": "DMP",
+            "scope": {
+                "in_scope": [
+                    "api.dmp.gouv.fr",
+                    "wps-cps.dmp.gouv.fr",
+                    "wps-cps.cv.dmp.gouv.fr",
+                    "auth.dmp.gouv.fr",
+                    "web-mh.dmp.gouv.fr",
+                    "lps.dmp.gouv.fr",
+                    "lps2.dmp.gouv.fr",
+                    "https://www.dmp.fr",
+                    "https://www.dmp.gouv.fr",
+                    "https://sip2.dmp.gouv.fr",
+                ],
+                "out_of_scope": [
+                    "*.dmp.fr",
+                    "*.dmp.gouv.fr",
+                    "monespacesante.fr",
+                    "monespacesante.gouv.fr",
+                ],
+            },
+        }
+
+    def test_explicit_in_scope_beats_wildcard_oos(self, dmp_like_program):
+        # wps-cps.dmp.gouv.fr is explicitly in_scope; *.dmp.gouv.fr wildcard
+        # must NOT knock it out of scope.
+        verdict = AuthorizationResolver.resolve_authorization(
+            dmp_like_program, "wps-cps.dmp.gouv.fr"
+        )
+        assert verdict["verdict"] == "in_scope"
+
+    def test_other_explicit_in_scope_hosts_allowed(self, dmp_like_program):
+        for host in ("api.dmp.gouv.fr", "auth.dmp.gouv.fr", "lps2.dmp.gouv.fr"):
+            verdict = AuthorizationResolver.resolve_authorization(dmp_like_program, host)
+            assert verdict["verdict"] == "in_scope", host
+
+    def test_unlisted_child_caught_by_wildcard_oos(self, dmp_like_program):
+        # evil.dmp.gouv.fr is NOT explicitly listed -> wildcard catch-all blocks it.
+        verdict = AuthorizationResolver.resolve_authorization(
+            dmp_like_program, "evil.dmp.gouv.fr"
+        )
+        assert verdict["verdict"] == "out_of_scope"
+        assert "*.dmp.gouv.fr" in verdict["rule"]
+
+    def test_explicit_oos_still_wins(self, dmp_like_program):
+        verdict = AuthorizationResolver.resolve_authorization(
+            dmp_like_program, "monespacesante.gouv.fr"
+        )
+        assert verdict["verdict"] == "out_of_scope"
+
+    def test_unknown_not_listed(self, dmp_like_program):
+        verdict = AuthorizationResolver.resolve_authorization(
+            dmp_like_program, "unrelated.gov"
+        )
+        assert verdict["verdict"] == "unknown"
+
+    def test_wildcard_oos_carveout_beats_wildcard_inscope(self):
+        # "*.dev.api.acme.com" carved out of "*.api.acme.com" -> out_of_scope
+        prog = {
+            "scope": {
+                "wildcards": ["*.api.acme.com"],
+                "out_of_scope": ["*.dev.api.acme.com"],
+            }
+        }
+        verdict = AuthorizationResolver.resolve_authorization(
+            prog, "x.dev.api.acme.com"
+        )
+        assert verdict["verdict"] == "out_of_scope"
+        # sibling still in scope
+        verdict2 = AuthorizationResolver.resolve_authorization(
+            prog, "x.prod.api.acme.com"
+        )
+        assert verdict2["verdict"] == "in_scope"
