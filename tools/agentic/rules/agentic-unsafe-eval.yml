@@ -1,0 +1,8 @@
+rules:
+  - id: agentic-unsafe-eval
+    languages: [python]
+    severity: ERROR
+    message: Unsafe dynamic evaluation — eval/exec reached (auditor will prove/disprove)
+    pattern-either:
+      - pattern: eval($CODE)
+      - pattern: exec($CODE)

@@ -1,0 +1,9 @@
+rules:
+  - id: agentic-path-traversal
+    languages: [python]
+    severity: ERROR
+    message: Potential path traversal — file-open sink reached (auditor will prove/disprove)
+    pattern-either:
+      - pattern: open($PATH, ...)
+      - pattern: Path($PATH)
+      - pattern: os.path.join($PRE, $PATH)

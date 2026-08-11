@@ -41,3 +41,6 @@ config/gh/
 *.zip
 *.tar
 tools/*/__pycache__/
+
+# Agentic validator runtime output
+findings/

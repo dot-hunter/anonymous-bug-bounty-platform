@@ -1,0 +1,9 @@
+rules:
+  - id: agentic-sql-injection
+    languages: [python]
+    severity: ERROR
+    message: Potential SQL injection — SQL sink reached (auditor will prove/disprove)
+    pattern-either:
+      - pattern: $CUR.execute($QUERY, ...)
+      - pattern: $CUR.executemany($QUERY, ...)
+      - pattern: $CUR.executescript($QUERY)

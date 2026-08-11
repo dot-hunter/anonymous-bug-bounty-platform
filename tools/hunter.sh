@@ -10,6 +10,8 @@
 #   bash tools/hunter.sh --target target.com --focus xss,ssrf
 #   bash tools/hunter.sh --target target.com --recon-only
 #   bash tools/hunter.sh --target target.com --hunt-only
+#   bash tools/hunter.sh --audit <repo> [--sandbox jail|docker|auto]
+#   bash tools/hunter.sh --retest <report.json> --target-dir <repo> [--sandbox jail]
 #   bash tools/hunter.sh --status
 #
 # Pipeline (scope-gated):
@@ -20,12 +22,14 @@
 #   4. Takeover sweep + token scan
 #   5. Active hunt (hunt.py or focused class tests)
 #   6. WAF analysis + bypass if blocked
-#   7. Summary → findings/<target>/summary.txt
+#   7. Agentic PoC validation (--audit / --retest)
+#   8. Summary → findings/<target>/summary.txt
 set -uo pipefail
 
 TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_ROOT="$(dirname "$TOOLS_DIR")"
-TARGET=""; PROGRAM=""; PLATFORM="hackerone"; MODE="full"; FOCUS=""
+TARGET=""; PROGRAM=""; PLATFORM="hackerone"; MODE="full"; FOCUS=""; SANDBOX="auto"
+AUDIT_REPO=""; RETEST_REPORT=""; RETEST_DIR=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -37,6 +41,10 @@ while [ $# -gt 0 ]; do
     --hunt-only) MODE="hunt"; shift;;
     --focus) FOCUS="$2"; shift 2;;
     --status) MODE="status"; shift;;
+    --audit) MODE="audit"; AUDIT_REPO="$2"; shift 2;;
+    --retest) MODE="retest"; RETEST_REPORT="$2"; shift 2;;
+    --target-dir) RETEST_DIR="$2"; shift 2;;
+    --sandbox) SANDBOX="$2"; shift 2;;
     *) echo "unknown arg: $1" >&2; exit 2;;
   esac
 done
@@ -54,7 +62,22 @@ if [ "$MODE" = "status" ]; then
   echo ""
   echo "◆ RAG index"
   [ -f "$OUT_ROOT/rag-index.db" ] && echo "  [✓] rag-index.db exists" || echo "  [ ] rag-index.db missing — run: python3 tools/rag-builder/build.py --corpus data"
+  echo ""
+  echo "◆ agentic validator"
+  python3 "$TOOLS_DIR/agentic/sandbox_runner.py" --detect
   exit 0
+fi
+
+# ---------- STAGE 0b: agentic audit / retest (no network target needed) ----------
+if [ "$MODE" = "audit" ]; then
+  echo "◆ Agentic PoC validation — $AUDIT_REPO (sandbox: $SANDBOX)"
+  python3 "$TOOLS_DIR/agentic/agentic_audit.py" --target-dir "$AUDIT_REPO" --sandbox "$SANDBOX"
+  exit $?
+fi
+if [ "$MODE" = "retest" ]; then
+  echo "◆ Retest — $RETEST_REPORT vs $RETEST_DIR (sandbox: $SANDBOX)"
+  python3 "$TOOLS_DIR/agentic/agentic_audit.py" --retest "$RETEST_REPORT" --target-dir "$RETEST_DIR" --sandbox "$SANDBOX"
+  exit $?
 fi
 
 # ---------- STAGE 0: OPSEC bootstrap (honest mode) ----------

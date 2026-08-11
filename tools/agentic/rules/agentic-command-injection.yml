@@ -1,0 +1,20 @@
+rules:
+  - id: agentic-command-injection
+    languages: [python]
+    severity: ERROR
+    message: Potential command injection — shell sink reached (auditor will prove/disprove)
+    pattern-either:
+      - pattern: os.system($CMD)
+      - pattern: os.popen($CMD)
+      # NOTE: this semgrep build cannot match keyword args (shell=True) or
+      # metavariables inside multiline call args — use plain ellipsis and let
+      # the PoC auditor disprove shell=False / list-form invocations.
+      - patterns:
+          - pattern: subprocess.run(...)
+          - pattern-not-regex: shell\s*=\s*False
+      - patterns:
+          - pattern: subprocess.call(...)
+          - pattern-not-regex: shell\s*=\s*False
+      - patterns:
+          - pattern: subprocess.Popen(...)
+          - pattern-not-regex: shell\s*=\s*False
