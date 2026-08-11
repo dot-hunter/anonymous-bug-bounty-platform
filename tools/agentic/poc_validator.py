@@ -67,12 +67,32 @@ CLASS_MARKERS = {
 }
 
 
+# RAG corpus class keys differ from checker names — alias to corpus vocabulary
+# (command_injection→rce, path_traversal→lfi, ...) so lookups actually hit.
+CORPUS_CLASS_ALIASES = {
+    "command_injection": "rce",
+    "command_exec": "rce",
+    "subprocess_shell_true": "rce",
+    "os_command": "rce",
+    "path_traversal": "lfi",
+    "file_read": "lfi",
+    "lfi": "lfi",
+    "sqli": "sqli",
+    "xss": "xss",
+    "ssti": "ssti",
+    "ssrf": "ssrf",
+    "open_redirect": "ssrf",
+    "secret_leak": "jwt",
+}
+
+
 def corpus_payloads(vuln_class: str, query: str, max_payloads: int = 3) -> list[str]:
     """Pull payload candidates from the RAG corpus CLI (best-effort)."""
     rag = Path(__file__).resolve().parents[1] / "rag-builder" / "search_payloads.py"
+    corpus_class = CORPUS_CLASS_ALIASES.get(vuln_class, vuln_class)
     try:
         p = subprocess.run(
-            [sys.executable, str(rag), "--class", vuln_class, "--query", query, "--top", str(max_payloads)],
+            [sys.executable, str(rag), "--class", corpus_class, "--query", query, "--top", str(max_payloads)],
             capture_output=True, text=True, timeout=30,
         )
         hits = []
