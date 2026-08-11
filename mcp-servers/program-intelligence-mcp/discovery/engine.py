@@ -70,6 +70,33 @@ class DiscoveryEngine:
         self.connectors["firebounty"] = FireBountyConnector(self)
         self.connectors["securitytxt"] = SecurityTxtConnector(self)
         self.connectors["standalone"] = StandaloneConnector(self)
+        self._register_provider_connectors()
+
+    def _register_provider_connectors(self) -> None:
+        """Wire the authorized-discovery providers registry into the engine.
+
+        Providers (hackerone, bugcrowd, intigriti, yeswehack, securitytxt)
+        are policy-gated via ``config.provider_enabled`` and only read
+        publicly published program scope data. Registering them here makes
+        ``discover_programs`` / ``discover_new`` actually return real
+        programs instead of only the built-in (mostly offline) connectors.
+        """
+        try:
+            from providers import BUILTIN_PROVIDERS, get_provider
+        except Exception as exc:  # pragma: no cover - provider import edge
+            logger.warning("Provider registry unavailable: %s", exc)
+            return
+
+        for name in BUILTIN_PROVIDERS:
+            try:
+                from config import provider_enabled
+                if not provider_enabled(name):
+                    continue
+                provider = get_provider(name)
+                self.connectors[f"provider:{name}"] = ProviderConnector(self, name, provider)
+                logger.info("Registered provider connector: %s", name)
+            except Exception as exc:
+                logger.warning("Provider connector %s failed to register: %s", name, exc)
 
     def register_connector(self, name: str, connector: Any) -> None:
         """Register a new connector at runtime."""
@@ -281,6 +308,32 @@ class BaseConnector:
         return changes
 
 
+class ProviderConnector(BaseConnector):
+    """Connector adapter that bridges the authorized-discovery providers
+    registry (providers/) into the DiscoveryEngine.
+
+    Providers only read publicly published program scope data (program
+    pages, security.txt, public datasets) and never perform active testing.
+    """
+
+    def __init__(self, engine: DiscoveryEngine, name: str, provider: Any):
+        super().__init__(engine)
+        self.name = name
+        self.provider = provider
+
+    def discover(self) -> list[dict]:
+        """Delegate to the wrapped provider. Results are already normalized."""
+        try:
+            return self.provider.discover() or []
+        except Exception as exc:
+            logger.warning("ProviderConnector %s discover failed: %s", self.name, exc)
+            return []
+
+    def normalize(self, raw: dict) -> dict | None:
+        """Provider results are pre-normalized (ProgramSchema); pass through."""
+        return raw if isinstance(raw, dict) else None
+
+
 class ProjectDiscoveryConnector(BaseConnector):
     """Connector for ProjectDiscovery Public Programs (via Chaos API or public data)."""
 
@@ -315,7 +368,12 @@ class ProjectDiscoveryConnector(BaseConnector):
         if h1_cache.exists():
             try:
                 data = json.loads(h1_cache.read_text())
-                for item in data if isinstance(data, list) else []:
+                # Cache is written as {"timestamp": ..., "programs": [...]}
+                if isinstance(data, dict):
+                    items = data.get("programs", [])
+                else:
+                    items = data
+                for item in items if isinstance(items, list) else []:
                     programs.append(item)
             except (json.JSONDecodeError, OSError):
                 pass

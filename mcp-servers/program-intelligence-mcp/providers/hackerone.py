@@ -66,6 +66,9 @@ class HackerOneProvider(BaseProvider):
         candidates = [
             DATA_DIR / "hackerone_cache.json",
             DATA_DIR / "hackerone_programs.json",
+            # Written by _save_cache(key="hackerone_programs_cache") — the
+            # canonical 24h cache this provider itself produces.
+            DATA_DIR / f"{self.cache_key}.json",
         ]
         for path in candidates:
             if path.exists():

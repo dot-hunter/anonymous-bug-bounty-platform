@@ -36,6 +36,78 @@ class TestProviderRegistry:
             providers.discover(provider="bogus")
 
 
+class TestBugcrowdProviderMapping:
+    def test_map_row_skips_string_targets(self):
+        """The public bugcrowd dataset contains bare strings in some
+        programs' targets lists (e.g. "in_scope") — mapping must not crash."""
+        from providers.bugcrowd import BugcrowdProvider
+
+        prov = BugcrowdProvider()
+        row = {
+            "name": "Acme Crowd",
+            "url": "https://bugcrowd.com/acme",
+            "targets": [
+                "in_scope",  # dataset quirk — bare string
+                {"name": "Website", "uri": "https://acme.com", "in_scope": True, "type": "website"},
+                {"name": "API", "uri": "https://api.acme.com", "in_scope": True, "type": "api"},
+                {"name": "Admin", "uri": "https://acme.com/admin", "in_scope": False, "type": "website"},
+            ],
+        }
+        mapped = prov._map_row(row)
+        assert mapped["handle"] == "acme"
+        assert "https://acme.com" in mapped["scope"]["domains"]
+        assert "https://api.acme.com" in mapped["scope"]["assets"]
+        assert "https://acme.com/admin" in mapped["scope"]["out_of_scope"]
+
+
+class TestIntigritiProviderMapping:
+    def test_map_row_uses_row_handle(self):
+        """Intigriti program URLs all end in '/detail' — the stable
+        dataset handle must win or every program collapses to one."""
+        from providers.intigriti import IntigritiProvider
+
+        prov = IntigritiProvider()
+        row = {
+            "id": "554fc6c5",
+            "name": "Aikido Security: Bug Bounty Program",
+            "company_handle": "aikido",
+            "handle": "aikido",
+            "url": "https://www.intigriti.com/programs/aikido/aikido/detail",
+            "domains": ["*.aikido.dev"],
+            "targets": [],
+        }
+        mapped = prov._map_row(row)
+        assert mapped["handle"] == "aikido"
+        assert mapped["handle"] != "detail"
+        assert "*.aikido.dev" in mapped["scope"]["wildcards"]
+
+    def test_dedupe_keeps_distinct_handles(self):
+        """Two intigriti programs must survive dedupe even though both
+        URLs end in /detail."""
+        from providers.intigriti import IntigritiProvider
+
+        prov = IntigritiProvider()
+        rows = [
+            {
+                "name": "Aikido",
+                "handle": "aikido",
+                "url": "https://www.intigriti.com/programs/aikido/aikido/detail",
+                "domains": [],
+                "targets": [],
+            },
+            {
+                "name": "Citrix",
+                "handle": "citrix",
+                "url": "https://www.intigriti.com/programs/citrix/citrix/detail",
+                "domains": [],
+                "targets": [],
+            },
+        ]
+        mapped = [prov._normalize(prov._map_row(r)) for r in rows]
+        deduped = prov._dedupe(mapped)
+        assert {p["handle"] for p in deduped} == {"aikido", "citrix"}
+
+
 class TestHackerOneProviderMapping:
     def test_map_row(self):
         prov = HackerOneProvider()

@@ -74,7 +74,15 @@ class IntigritiProvider(BaseProvider):
     def _map_row(self, row: dict) -> dict:
         # arkadiyt intigriti rows: {"name": ..., "url": ..., "max_bounty": ...,
         # "min_bounty": ..., "domains": [...], "targets": [...]}
-        handle = (row.get("url") or "").rstrip("/").split("/")[-1]
+        # The row carries a stable handle/company_handle. URL-based handle
+        # derivation is unreliable: every intigriti program URL ends in
+        # "/detail", which would collapse all programs into one handle.
+        handle = (
+            row.get("handle")
+            or row.get("company_handle")
+            or (row.get("url") or "").rstrip("/").split("/")[-1]
+            or (row.get("name") or "").lower().replace(" ", "-")
+        )
         domains = row.get("domains", []) if isinstance(row, dict) else []
         targets = row.get("targets", []) if isinstance(row, dict) else []
 
@@ -94,7 +102,7 @@ class IntigritiProvider(BaseProvider):
                 assets.append(uri)
 
         return {
-            "handle": handle or (row.get("name") or "").lower().replace(" ", "-"),
+            "handle": handle,
             "name": row.get("name"),
             "platform": "Intigriti",
             "url": row.get("url"),

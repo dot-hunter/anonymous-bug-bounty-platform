@@ -82,6 +82,10 @@ class BugcrowdProvider(BaseProvider):
         assets: list[str] = []
         oos: list[str] = []
         for t in targets:
+            # Dataset quirk: some rows contain bare strings like "in_scope"
+            # instead of target dicts — skip them.
+            if not isinstance(t, dict):
+                continue
             uri = (t.get("uri") or "").strip()
             if not uri:
                 continue
